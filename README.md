@@ -49,11 +49,13 @@ graph TD
     end
 
     subgraph P3["Phase 3: Modeling & Evaluation"]
-        B1 -->|Train| D[Baseline: TF-IDF + Logistic Regression]
+        B1 -->|Train| D[Bitext Baseline: TF-IDF + Logistic Regression]
         B1 -->|Train| E[SLM: Fine-Tuning DistilBERT]
+        C2 -->|Train 80/20 In-Domain Split| H[TWCS In-Domain Baseline: TF-IDF + Logistic Regression]
         C2 -->|Evaluate| F[Cross-Domain Evaluation]
         D --> F
         E --> F
+        H --> F
         F --> G[Interactive Streamlit Demo]
     end
 ```
