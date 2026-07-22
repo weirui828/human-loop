@@ -1,0 +1,19 @@
+{
+  "model_name": "TF-IDF + Logistic Regression (TWCS In-Domain)",
+  "train_samples": 16000,
+  "test_samples": 4000,
+  "train_duration_sec": 0.6336,
+  "metrics": {
+    "accuracy": 0.8123,
+    "precision_macro": 0.812,
+    "recall_macro": 0.8132,
+    "f1_macro": 0.812,
+    "roc_auc": 0.8963
+  },
+  "confusion_matrix": {
+    "tn": 1553,
+    "fp": 321,
+    "fn": 430,
+    "tp": 1696
+  }
+}

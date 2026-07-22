@@ -1,3 +1,8 @@
+.project/
+
+# macOS
+.DS_Store
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[codz]
@@ -99,6 +104,7 @@ ipython_config.py
 #   This is especially recommended for binary packages to ensure reproducibility, and is more
 #   commonly ignored for libraries.
 # uv.lock
+.uv_cache/
 
 # poetry
 #   Similar to Pipfile.lock, it is generally recommended to include poetry.lock in version control.
@@ -216,3 +222,12 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# Large data artifacts (raw + generated; reproducible via src/ scripts)
+data/twcs/twcs.csv
+data/twcs/reconstructed_threads_20k.csv
+data/twcs/reconstructed_threads_20k.json
+data/twcs/labeled_twcs_20k.csv
+data/bitext/Bitext_Sample_Customer_Support_Training_Dataset_27K_responses-v11.csv
+data/bitext/cleaned_bitext_training_data.csv
+# Keep: data/twcs/sample.csv, data/bitext/data_desc.md, and models/ artifacts
