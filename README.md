@@ -39,16 +39,16 @@ This project utilizes a two-dataset split to evaluate cross-domain generalizatio
 
 ```mermaid
 graph TD
-    subgraph Phase 1: Training Prep (Bitext)
+    subgraph P1["Phase 1: Training Prep (Bitext)"]
         A1[Bitext Raw CSV] -->|Rule-Based Intent Mapping| B1[Binary Escalation Train Set]
     end
 
-    subgraph Phase 2: Evaluation Prep (TWCS)
+    subgraph P2["Phase 2: Evaluation Prep (TWCS)"]
         A2[TWCS Raw CSV] -->|DFS Thread Reconstructor| B2[Conversation Threads]
         B2 -->|LLM Auto-Labeler| C2[Binary Escalation Test Set]
     end
 
-    subgraph Phase 3: Modeling & Evaluation
+    subgraph P3["Phase 3: Modeling & Evaluation"]
         B1 -->|Train| D[Baseline: TF-IDF + Logistic Regression]
         B1 -->|Train| E[SLM: Fine-Tuning DistilBERT]
         C2 -->|Evaluate| F[Cross-Domain Evaluation]
