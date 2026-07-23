@@ -32,6 +32,7 @@ This project utilizes a two-dataset split to evaluate cross-domain generalizatio
    - *Characteristics:* Real-world, noisy social media posts featuring slang, abbreviations, emojis, and typos.
    - *Reconstruction:* programmatically woven into multi-turn threads by tracing parent-child reply relationships.
    - *Labeling:* **LLM-Assisted (Google Gemini 1.5 Flash)**. Raw conversation threads are labeled by `gemini-1.5-flash` to build a high-quality, real-world validation ground truth.
+   - *Dual Role:* Beyond serving as the cross-domain evaluation set for the Bitext-trained models, this labeled TWCS data is **also** split 80/20 to train **in-domain reference models** (TF-IDF and DistilBERT) on target Twitter vocabulary. These establish the achievable upper bound when real-world labels *are* available, isolating how much of the cross-domain gap stems from vocabulary mismatch versus model architecture.
 
 ---
 
@@ -50,12 +51,14 @@ graph TD
 
     subgraph P3["Phase 3: Modeling & Evaluation"]
         B1 -->|Train| D[Bitext Baseline: TF-IDF + Logistic Regression]
-        B1 -->|Train| E[SLM: Fine-Tuning DistilBERT]
+        B1 -->|Train| E[Bitext SLM: Fine-Tuning DistilBERT]
         C2 -->|Train 80/20 In-Domain Split| H[TWCS In-Domain Baseline: TF-IDF + Logistic Regression]
+        C2 -->|Train 80/20 In-Domain Split| I[TWCS In-Domain SLM: Fine-Tuning DistilBERT]
         C2 -->|Evaluate| F[Cross-Domain Evaluation]
         D --> F
         E --> F
         H --> F
+        I --> F
         F --> G[Interactive Streamlit Demo]
     end
 ```
@@ -67,14 +70,14 @@ We classify each of the 27 intents in the Bitext dataset into binary targets. Si
 We use a depth-first search (DFS) reply-chain parser to stitch together tweets into cohesive dialogues. An LLM acts as the evaluator to decide whether a customer thread requires a human escalation or could be handled by a bot.
 
 ### 3. Baseline Modeling
-A classic machine learning pipeline (TF-IDF + Logistic Regression) is trained on the Bitext dataset to establish a performance floor.
+A classic machine learning pipeline (TF-IDF + Logistic Regression) is trained on the Bitext dataset to establish a performance floor. We additionally train a second, **in-domain** TF-IDF + Logistic Regression baseline directly on TWCS (80/20 split) to measure the ceiling achievable with target-domain vocabulary.
 
 ### 4. SLM Fine-Tuning
-A pre-trained **DistilBERT** model (`distilbert-base-uncased`) is fine-tuned on the Bitext training set, optimizing hyperparameters such as learning rate and batch size.
+A pre-trained **DistilBERT** model (`distilbert-base-uncased`) is fine-tuned on the Bitext training set, optimizing hyperparameters such as learning rate and batch size. In parallel, we fine-tune an **in-domain** DistilBERT on the TWCS 80/20 split, giving us both a cross-domain and an in-domain SLM for comparison.
 
 ### 5. Performance Evaluation & Benchmarking
-Both models are evaluated on the TWCS test set. We analyze:
-- **Generalization Drop:** Performance on in-domain validation data (Bitext) vs. out-of-domain test data (TWCS).
+The Bitext-trained models are evaluated **cross-domain** on the full TWCS test set, while the TWCS-trained models are evaluated **in-domain** on their held-out 20% split. We analyze:
+- **Generalization Drop:** Cross-domain performance (Bitext → TWCS) against both the in-domain Bitext ceiling and the in-domain TWCS reference.
 - **Metric Breakdown:** F1-Score, Precision, Recall, and ROC-AUC.
 - **Latency Benchmarks:** Inference time distribution (ms) on CPU vs. GPU.
 
@@ -122,7 +125,7 @@ To quantify the vulnerability of surface-level lexical representations (`TF-IDF`
 - **Lexical Overfitting & Domain Shift:** The linear n-gram model drops by over **45 percentage points** in Macro F1 when transitioned from structured instructions (`Bitext`) to noisy social media threads (`TWCS`). Without semantic abstraction, TF-IDF cannot recognize that slang (`wtf`, `sux`, `pls help`) or multi-turn conversational patterns map to the exact same customer intents trained in Bitext.
 - **In-Domain Twitter Floor vs. Architectural Ceiling (`0.8120` F1):** When a TF-IDF + Logistic Regression pipeline is trained directly on target Twitter vocabulary (`models/twcs/twcs_metrics.json`), Macro F1 rebounds significantly to `0.8120` (`+26.76%`). This proves that vocabulary mismatch accounts for roughly half of the cross-domain degradation. However, linear TF-IDF still hits a hard ceiling at `0.8120` (`430 False Negatives`), showing that deep contextual representations (**DistilBERT**) are required to capture multi-turn dialogue progression and negation across channels.
 
-In **Module 24**, we fine-tune **DistilBERT** (`distilbert-base-uncased`) to overcome this lexical brittleness and establish robust cross-domain classification.
+As **future development**, we fine-tune **DistilBERT** (`distilbert-base-uncased`) to overcome this lexical brittleness and establish robust cross-domain classification.
 
 ---
 
@@ -177,52 +180,18 @@ human-loop/
 
 ---
 
-## 🚀 Quick Start & Setup
+## 📓 Explore the Notebooks
 
-### Prerequisites
-- Python 3.10 or higher
-- Optional: CUDA-capable GPU for faster DistilBERT training
+The full analysis, visualizations, and results are already captured in the two notebooks below — the datasets have been preprocessed, labeled, and modeled, and the trained artifacts live in [`models/`](models/). **No re-running of the pipeline is required to follow the work** — just open the notebooks:
 
-### 1. Clone & Install Dependencies
+| Notebook | What's Inside |
+| :--- | :--- |
+| **[01_bitext_baseline_modeling.ipynb](notebooks/01_bitext_baseline_modeling.ipynb)** | EDA, data cleaning, feature engineering, and the in-domain TF-IDF + Logistic Regression baseline on the Bitext dataset (`F1 = 0.9964`). |
+| **[02_twcs_baseline_modeling.ipynb](notebooks/02_twcs_baseline_modeling.ipynb)** | TWCS thread reconstruction, LLM labeling review, and the cross-domain vs. in-domain generalization benchmark (`0.5444` cross-domain vs. `0.8120` in-domain F1). |
+
+*Optional — to run the notebooks locally, install the dependencies first:*
 ```bash
-git clone https://github.com/your-username/human-loop.git
-cd human-loop
-pip install -r requirements.txt
-```
-
-*Note: You can also use [uv](https://github.com/astral-sh/uv) for lightning-fast installation:*
-```bash
-uv pip install -r requirements.txt
-```
-
-### 2. Configure Environment Variables
-Create a `.env` file in the root directory and add your Google Gemini API key for the TWCS labeling pipeline:
-```env
-GEMINI_API_KEY=your_gemini_api_key_here
-```
-
-### 3. Run Preprocessing and Thread Reconstruction
-Prepare the training data:
-```bash
-python3 src/bitext/preprocess_bitext.py
-```
-
-Stitch and label the Twitter validation data:
-```bash
-python3 src/twcs/reconstruct_conversations.py
-python3 src/twcs/label_twcs.py
-```
-
-### 4. Train the Models
-Train the baseline models:
-```bash
-python3 src/bitext/train_bitext.py
-python3 src/twcs/train_twcs.py
-```
-
-### 5. Launch the Streamlit Demo
-```bash
-streamlit run app.py
+pip install -r requirements.txt   # or: uv pip install -r requirements.txt
 ```
 
 ---
