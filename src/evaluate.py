@@ -11,6 +11,7 @@ and saves benchmark results to `models/cross_domain_metrics.json`.
 
 import os
 import json
+import time
 import joblib
 import pandas as pd
 from sklearn.metrics import (
@@ -32,6 +33,26 @@ MODEL_PATH = os.path.join(BASE_DIR, "models", "bitext", "tfidf_bitext.pkl")
 BITEXT_METRICS_PATH = os.path.join(BASE_DIR, "models", "bitext", "bitext_metrics.json")
 TWCS_TEST_PATH = os.path.join(BASE_DIR, "data", "twcs", "labeled_twcs_20k.csv")
 OUTPUT_METRICS_PATH = os.path.join(BASE_DIR, "models", "cross_domain_metrics.json")
+
+
+def benchmark_latency(model: Pipeline, sample_texts: list, n_iterations: int = 500) -> float:
+    """Measures average inference latency in milliseconds (ms) per sample."""
+    print(f"\nRunning latency benchmark over {n_iterations} single-instance predictions...")
+    # Warmup
+    for _ in range(10):
+        _ = model.predict([sample_texts[0]])
+
+    start_time = time.perf_counter()
+    for i in range(n_iterations):
+        idx = i % len(sample_texts)
+        _ = model.predict([sample_texts[idx]])
+    end_time = time.perf_counter()
+
+    total_time_ms = (end_time - start_time) * 1000.0
+    avg_latency_ms = total_time_ms / n_iterations
+    print(f"Total time for {n_iterations} inferences: {total_time_ms:.2f} ms")
+    print(f"Average inference latency: {avg_latency_ms:.4f} ms/query")
+    return avg_latency_ms
 
 
 def run_evaluation(full: bool = False, input_path: str = None, output_path: str = None):
@@ -79,6 +100,10 @@ def run_evaluation(full: bool = False, input_path: str = None, output_path: str 
         
     cm = confusion_matrix(y_test, y_pred)
     
+    # Measure cross-domain latency
+    test_texts_sample = X_test_customer.tolist()[:500]
+    avg_latency_ms = benchmark_latency(model, test_texts_sample, n_iterations=500)
+
     # Calculate exact generalization drop
     f1_drop = bitext_metrics["f1_score"] - twcs_f1
     auc_drop = bitext_metrics["roc_auc"] - twcs_auc
@@ -125,7 +150,11 @@ def run_evaluation(full: bool = False, input_path: str = None, output_path: str 
             "recall_macro": twcs_rec,
             "accuracy": twcs_acc,
             "roc_auc": twcs_auc,
-            "confusion_matrix": cm.tolist()
+            "confusion_matrix": cm.tolist(),
+            "latency_benchmark": {
+                "avg_inference_ms_per_query": round(avg_latency_ms, 4),
+                "test_iterations": 500
+            }
         },
         "twcs_in_domain_cv_f1": in_domain_twcs_f1,
         "generalization_drop": {

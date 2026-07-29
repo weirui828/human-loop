@@ -101,16 +101,13 @@ def engineer_features(df: pd.DataFrame) -> pd.DataFrame:
         df[col_name] = flags_series.apply(lambda s: int(flag_char in str(s)))
 
     print("Engineering structural length and entity slot features...")
-    # Text lengths
+    # Text lengths for instruction input
     df["char_len_instruction"] = df["instruction"].astype(str).str.len()
     df["word_len_instruction"] = df["instruction"].astype(str).str.split().str.len()
-    df["char_len_response"] = df["response"].astype(str).str.len()
-    df["word_len_response"] = df["response"].astype(str).str.split().str.len()
 
     # Entity slot counts using regex matching {{Slot Name}}
     entity_pattern = re.compile(r"\{\{[^}]+\}\}")
     df["entity_count_instruction"] = df["instruction"].astype(str).apply(lambda s: len(entity_pattern.findall(s)))
-    df["entity_count_response"] = df["response"].astype(str).apply(lambda s: len(entity_pattern.findall(s)))
 
     return df
 

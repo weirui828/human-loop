@@ -36,6 +36,26 @@ MODEL_PATH = os.path.join(MODEL_DIR, "tfidf_twcs.pkl")
 METRICS_PATH = os.path.join(MODEL_DIR, "twcs_metrics.json")
 
 
+def benchmark_latency(model: Pipeline, sample_texts: list, n_iterations: int = 500) -> float:
+    """Measures average inference latency in milliseconds (ms) per sample."""
+    print(f"\nRunning latency benchmark over {n_iterations} single-instance predictions...")
+    # Warmup
+    for _ in range(10):
+        _ = model.predict([sample_texts[0]])
+
+    start_time = time.perf_counter()
+    for i in range(n_iterations):
+        idx = i % len(sample_texts)
+        _ = model.predict([sample_texts[idx]])
+    end_time = time.perf_counter()
+
+    total_time_ms = (end_time - start_time) * 1000.0
+    avg_latency_ms = total_time_ms / n_iterations
+    print(f"Total time for {n_iterations} inferences: {total_time_ms:.2f} ms")
+    print(f"Average inference latency: {avg_latency_ms:.4f} ms/query")
+    return avg_latency_ms
+
+
 def main():
     if not os.path.exists(DATA_PATH):
         raise FileNotFoundError(f"TWCS dataset not found at {DATA_PATH}. Please run labeling first.")
@@ -112,6 +132,10 @@ def main():
     print(classification_report(y_test, y_pred, target_names=["Self-Service (0)", "Escalated (1)"]))
     print("==================================================================")
 
+    # Latency Benchmark
+    test_texts_sample = X_test.tolist()[:500]
+    avg_latency_ms = benchmark_latency(pipeline, test_texts_sample, n_iterations=500)
+
     # Save model and metrics
     os.makedirs(MODEL_DIR, exist_ok=True)
     with open(MODEL_PATH, "wb") as f:
@@ -135,6 +159,10 @@ def main():
             "fp": int(cm[0, 1]),
             "fn": int(cm[1, 0]),
             "tp": int(cm[1, 1]),
+        },
+        "latency_benchmark": {
+            "avg_inference_ms_per_query": round(avg_latency_ms, 4),
+            "test_iterations": 500,
         },
     }
 

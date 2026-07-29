@@ -21,7 +21,11 @@
         6569,
         4062
       ]
-    ]
+    ],
+    "latency_benchmark": {
+      "avg_inference_ms_per_query": 0.2232,
+      "test_iterations": 500
+    }
   },
   "twcs_in_domain_cv_f1": 0.7750793623878545,
   "generalization_drop": {

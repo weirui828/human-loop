@@ -64,7 +64,21 @@ graph TD
 ```
 
 ### 1. Rule-Based Mapping (Bitext)
-We classify each of the 27 intents in the Bitext dataset into binary targets. Since Bitext is clean and pre-categorized, mapping is instantaneous and deterministic.
+We classify each of the 27 intents in the Bitext dataset into binary targets (`escalated = 1` vs. `escalated = 0`). Since Bitext is clean and pre-categorized, mapping is deterministic.
+
+#### 📌 Operational Rationale for the 7 Escalated Intents (`escalated = 1`)
+Out of the 27 Bitext intents, exactly 7 are designated as requiring human escalation based on standard Customer Experience (CX) and Operations taxonomy:
+
+1. **Direct request of human agent:**
+   - `contact_human_agent`, `contact_customer_service`: Direct customer requests for human intervention. Bypassing this request causes immediate CSAT drop.
+2. **Negative Sentiment:**
+   - `complaint`: Angry or dissatisfied customers require human empathy, negotiation, or goodwill compensation (discounts/vouchers) that bots cannot manage.
+3. **Financial Liability:**
+   - `payment_issue`, `get_refund`, `check_cancellation_fee`: Disbursing funds, failed transaction troubleshooting, or penalty fee disputes involve financial risk and policy overrides requiring human authorization.
+4. **Account Access Blockers:**
+   - `registration_problems`: Signup failures prevent new customer acquisition and require technical or identity verification.
+
+The remaining 20 intents (`track_order`, `recover_password`, `delivery_period`, `check_invoice`, etc.) represent static FAQ lookups or deterministic API operations suitable for automated self-service bots (`escalated = 0`).
 
 ### 2. Thread Reconstruction & LLM Labeling (TWCS)
 We use a depth-first search (DFS) reply-chain parser to stitch together tweets into cohesive dialogues. An LLM acts as the evaluator to decide whether a customer thread requires a human escalation or could be handled by a bot.
@@ -120,6 +134,7 @@ To quantify the vulnerability of surface-level lexical representations (`TF-IDF`
 | **Accuracy** | 0.9980 | 0.8123 | 0.5975 | -0.4005 |
 | **Precision (Macro)** | 0.9964 | 0.8120 | 0.5901 | -0.4063 |
 | **Recall (Macro)** | 0.9964 | 0.8132 | 0.5592 | -0.4372 |
+| **Inference Latency** | **0.1293 ms/query** | **0.2396 ms/query** | **0.2232 ms/query** | **+0.0939 ms/query** |
 
 **Key Benchmarking Takeaways:**
 - **Lexical Overfitting & Domain Shift:** The linear n-gram model drops by over **45 percentage points** in Macro F1 when transitioned from structured instructions (`Bitext`) to noisy social media threads (`TWCS`). Without semantic abstraction, TF-IDF cannot recognize that slang (`wtf`, `sux`, `pls help`) or multi-turn conversational patterns map to the exact same customer intents trained in Bitext.
