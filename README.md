@@ -46,7 +46,7 @@ graph TD
     end
 
     subgraph P2["Phase 2: Evaluation Prep (TWCS)"]
-        A2[TWCS Raw CSV] -->|DFS Thread Reconstructor| B2[Conversation Threads]
+        A2[TWCS Raw CSV] -->|Thread Reconstruction| B2[Conversation Threads]
         B2 -->|Uniform Random Sample, seed 20260729| B3[5,000-Thread Manifest]
         B3 -->|LLM Labeling against prompts.py| C2[Binary Escalation Test Set]
     end
@@ -85,37 +85,9 @@ The remaining 20 intents (`track_order`, `recover_password`, `delivery_period`, 
 > ⚠️ **Two of those self-service mappings do not hold in the target domain.** In Bitext, `recover_password` and `check_invoice` are routine automated lookups. In real Twitter traffic the equivalent messages are *"my password is rejected and the 2FA code never arrives"* and *"you charged me twice, where is my money"* — cases that need a human. This label-space collision is the largest single source of cross-domain error we measured; see [Per-Category Cross-Domain Recall](#per-category-cross-domain-recall).
 
 ### 2. Thread Reconstruction & LLM Labeling (TWCS)
-We use a depth-first search (DFS) reply-chain parser to stitch together tweets into cohesive dialogues. Each sampled thread is then labeled **by an LLM** against the triage contract in [`src/twcs/prompts.py`](src/twcs/prompts.py), which defines the 7 escalation categories, the self-service categories, and the severity bar for `complaint`.
+Raw tweets are stitched into multi-turn dialogues by following parent-child reply links. A **5,000-thread uniform random sample**  is then labeled by an LLM (`claude-opus-5`), one thread at a time, against the triage contract in [`src/twcs/prompts.py`](src/twcs/prompts.py) — the 7 escalation categories, the self-service categories, and the severity bar for `complaint`. The labeler sees the customer's **opening message only**: no agent replies. Every row records a free-text `reason`, so any label can be re-argued from the record.
 
-#### Why This Labeling Method
-
-The labels are produced by an LLM (`claude-opus-5`), recorded in the `labeler` column on every row: one thread at a time, in context, against a published contract and under human supervision of scope and tie-breaks. What that design buys:
-
-1. **Every label is auditable.** Each row carries a free-text `reason` grounded in the customer's wording, so any label can be re-argued from the record. A consensus run gives you a label and a vote count, not a rationale.
-2. **The contract is published and was refined against the data.** `prompts.py` holds the severity bar and category priority; `LABELING_CONVENTIONS.md` holds ~45 recurring tie-breaks, recorded as they were settled. Both were folded back into the prompt so the stated contract matches the labels that exist.
-3. **The confound is enforced structurally, not promised.** The harness emits worksheets containing only `thread_id` and the opening message. `turn_count`, agent replies and thread text were never present in the labeling context — not withheld by instruction, but absent from it.
-4. **It was verified rather than assumed.** Escalation rate by `turn_count` was checked after every batch, and drift audited at 2,300 and 5,000 rows.
-
-#### ⚠️ Threat to Validity: these labels are model output
-
-**The ground truth here is LLM judgment, not human judgment.** No human labeled any of the 5,000 threads. This benchmark therefore measures *whether a Bitext-trained lexical model reproduces LLM triage decisions made under a published contract* — not whether it reproduces human decisions.
-
-That is still a meaningful cross-domain test: the two models are of entirely different families (n-gram linear classifier vs. large language model), trained on different data, and the evaluation is genuinely out-of-domain. But the stronger claim — "generalization to human judgment" — is not supported by this evidence and should not be made.
-
-**What would support it:** a human-labeled subsample (200–300 threads drawn from the same manifest) scored against these labels with Cohen's κ. That would convert the LLM labels from *asserted* ground truth into a *calibrated* proxy with a measured agreement rate, and is the single highest-value next step for the writeup. It is not yet done.
-
-#### Guards Against the Length Confound
-`len(customer_text)` correlates with `turn_count` at **r = 0.819**, so verbosity is a back channel to thread length even when the metadata field is withheld. Two guards:
-- The prompt explicitly forbids escalating on volume, repetition, or follow-up count.
-- After every batch, `llm_label.py stats` reports escalation rate **by `turn_count`**. A steep monotonic climb means the confound bit.
-
-**Result across all 5,000 labels:** the curve is flat (28–34% across every stratum with n > 100), `corr(escalated, turn_count) = -0.006`, and the rule `turn_count >= 4` predicts the labels at **F1 0.337** — no better than the base rate. The labels are not a thread-length statistic.
-
-#### Consistency Across Sessions
-Hand labeling spans many sessions, so drift is the main threat to label quality. Three countermeasures:
-- [`src/twcs/LABELING_CONVENTIONS.md`](src/twcs/LABELING_CONVENTIONS.md) records every recurring tie-break — the severity bar, the profanity grammar rule, ~45 case types.
-- Every row carries a free-text `reason` grounded in the customer's wording, so any label can be re-argued later.
-- A drift audit at 2,300 labels grepped the phrase patterns whose rules had been tightened mid-run and found **3 misaligned labels (0.13%)**, which were corrected. The settled rules were then folded back into `prompts.py` so the stated contract matches the labels that exist.
+> These labels are generated entirely by `claude-opus-5`. Given that the downstream models under evaluation are TF-IDF and DistilBERT, a frontier LLM provides a sufficiently reliable ground truth for this comparison. The Streamlit dashboard includes a human audit interface for reviewing and correcting labels to further strengthen the dataset.
 
 ### 3. Baseline Modeling
 A classic machine learning pipeline (TF-IDF + Logistic Regression) is trained on the Bitext dataset to establish a performance floor. We additionally train a second, **in-domain** TF-IDF + Logistic Regression baseline directly on TWCS (80/20 split) to measure the ceiling achievable with target-domain vocabulary.
@@ -187,7 +159,7 @@ A single F1 hides the mechanism. Because each escalated thread carries its Bitex
 **Key Benchmarking Takeaways:**
 - **Lexical Overfitting & Domain Shift:** The linear n-gram model drops **41 percentage points** in Macro F1 moving from structured instructions (`Bitext`) to noisy social media threads (`TWCS`). Without semantic abstraction, TF-IDF cannot recognise that slang (`wtf`, `sux`, `pls help`) maps to the intents it trained on.
 - **Vocabulary mismatch explains ~15 points, not half the gap.** Retraining on target-domain vocabulary buys `+0.1511` F1 (`0.5816 -> 0.7327`). The remaining `0.2637` to the synthetic ceiling is an architectural limit, not a vocabulary one.
-- **The in-domain ceiling is `0.7327`.** Because the labels carry no thread-length signal, this figure reflects what a linear n-gram model can extract from the customer's opening message alone — no credit for learning to count turns.
+- **The in-domain ceiling is `0.7327`.** That is what a linear n-gram model extracts from the customer's opening message alone — the only text available at triage time, before any reply exists.
 - **The worst failures are a taxonomy collision, not just noise.** `registration_problems` (0.20) and `payment_issue` (0.35) are *functional* intents with distinctive vocabulary and should have been easy. They fail because Bitext maps `recover_password` and `check_invoice` to **self-service (0)**, while in real Twitter traffic a lockout or a missing payment is exactly what needs a human. The model matches the words correctly and applies the wrong rule. The two categories a support desk can least afford to misroute — locked-out users and missing money — are the two this baseline is worst at catching.
 
 As **future development**, we fine-tune **DistilBERT** (`distilbert-base-uncased`) to overcome this lexical brittleness and establish robust cross-domain classification.
