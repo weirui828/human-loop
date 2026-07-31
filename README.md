@@ -263,5 +263,27 @@ pip install -r requirements.txt   # or: uv pip install -r requirements.txt
 
 ---
 
+## 🚀 Running the Dashboard
+
+```bash
+pip install -r requirements.txt
+streamlit run app.py
+```
+
+The app opens two tabs:
+
+1. **Live Triage Simulator** — type a customer message and get an escalation prediction from the trained TF-IDF model (`models/twcs/tfidf_twcs.pkl`).
+2. **Human Label Audit** — review and correct LLM-generated labels from `llm_labeled_5k.csv`.
+
+![Dashboard — Live Triage Simulator](docs/ui.png)
+
+> [!NOTE]
+> The triage model must exist before the simulator tab works. If it's missing, train it first:
+> ```bash
+> python src/twcs/train_twcs.py
+> ```
+
+---
+
 ## 📄 License
 This project is licensed under the MIT License - see the LICENSE file for details.

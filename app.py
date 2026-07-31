@@ -11,6 +11,7 @@ Run:
 """
 import os
 import csv
+import pickle
 import pandas as pd
 import streamlit as st
 
@@ -103,6 +104,17 @@ st.markdown("""
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 LLM_LABELS_CSV = os.path.join(BASE_DIR, "data", "twcs", "llm_labeled_5k.csv")
 AUDIT_CSV = os.path.join(BASE_DIR, "data", "twcs", "human_audit_5k.csv")
+MODEL_PATH = os.path.join(BASE_DIR, "models", "twcs", "tfidf_twcs.pkl")
+
+@st.cache_resource
+def load_model():
+    """Load the trained TF-IDF + Logistic Regression pipeline."""
+    if not os.path.exists(MODEL_PATH):
+        return None
+    with open(MODEL_PATH, "rb") as f:
+        return pickle.load(f)
+
+triage_model = load_model()
 
 AUDIT_FIELDNAMES = [
     "thread_id", "llm_escalated", "llm_category", "llm_reason",
@@ -145,15 +157,17 @@ with tab1:
         user_input = st.text_area("Customer Utterance:", value=sample_query, height=100)
 
     if st.button("🚀 Analyze Escalation Risk", use_container_width=True):
-        text_lower = user_input.lower()
-        escalation_markers = ["manager", "unauthorized", "charge", "refund", "trippin", "pay", "error", "broken", "human", "speak", "lawyer"]
-        score = sum(1 for kw in escalation_markers if kw in text_lower)
-        is_escalated = (score > 0 or len(text_lower.split()) > 20)
-        confidence = min(0.60 + (score * 0.15), 0.99) if is_escalated else 0.92
-        if is_escalated:
-            st.error(f"🚨 **Escalation Required** — Class 1 (Human Agent Needed) · Confidence: **{confidence*100:.1f}%**")
+        if triage_model is None:
+            st.warning(f"Model not found at `{MODEL_PATH}`. Please run `train_twcs.py` first.")
         else:
-            st.success(f"🤖 **Bot Eligible** — Class 0 (Self-Service / FAQ) · Confidence: **{confidence*100:.1f}%**")
+            prediction = triage_model.predict([user_input])[0]
+            probabilities = triage_model.predict_proba([user_input])[0]
+            is_escalated = bool(prediction == 1)
+            confidence = probabilities[1] if is_escalated else probabilities[0]
+            if is_escalated:
+                st.error(f"🚨 **Escalation Required** — Class 1 (Human Agent Needed) · Confidence: **{confidence*100:.1f}%**")
+            else:
+                st.success(f"🤖 **Bot Eligible** — Class 0 (Self-Service / FAQ) · Confidence: **{confidence*100:.1f}%**")
 
 # ==============================================================================
 # TAB 2: HUMAN LABEL AUDIT
