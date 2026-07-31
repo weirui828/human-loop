@@ -15,12 +15,13 @@ threads that have a customer turn (`llm_label.py sample -n 5000 --seed
 manifest lists: `llm_label.py next --pool data/twcs/sample_pool_5000.txt`.
 
 Labeling started as a sequential pass before the sample existed, so
-`llm_labeled_20k.csv` also holds 639 threads from the first 850 rows of the
-file that fall outside the manifest. Those are a narrow slice -- Halloween 2017,
-a handful of brands, heavy on promo chatter -- and are NOT part of the random
-sample. Keep them for extra training signal if useful, but exclude them when
-estimating the escalation base rate or drawing an evaluation set; the manifest
-is the only uniform sample.
+`data/twcs/llm_labeled_out_of_sample.csv` holds 639 threads from the first 850
+rows of the file that fall outside the manifest. Those are a narrow slice --
+Halloween 2017, a handful of brands, heavy on promo chatter -- and are NOT part
+of the random sample. Keep them for extra training signal if useful, but exclude
+them when estimating the escalation base rate or drawing an evaluation set; the
+manifest is the only uniform sample. That file is untracked by git and exists
+only on the machine that produced it, so back it up before relying on it.
 
 ## Severity bar for `complaint`
 
