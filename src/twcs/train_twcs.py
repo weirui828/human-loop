@@ -2,8 +2,15 @@
 """
 train_twcs.py
 
-Trains a TF-IDF + Logistic Regression classifier directly on the labeled Twitter Customer Support
-(`TWCS`) dataset (`data/twcs/labeled_twcs_20k.csv`) using an 80/20 train/test split.
+Trains a TF-IDF + Logistic Regression classifier directly on the LLM-labeled Twitter
+Customer Support (`TWCS`) sample (`data/twcs/llm_labeled_5k.csv`) using an 80/20
+train/test split.
+
+The feature column is `first_customer_text` -- the customer's opening message, which is
+exactly what the LLM labeler saw. Using `customer_text` (every customer turn
+concatenated) would give the model text the labeler never saw and would reintroduce the
+length confound: it correlates with `turn_count` at r=0.819 versus r=0.065 for the
+opening message. See the LABELING CONTRACT note in src/twcs/prompts.py.
 
 Outputs:
 - Serialized model pipeline: `models/tfidf_twcs.pkl`
@@ -30,7 +37,8 @@ from sklearn.metrics import (
 )
 
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-DATA_PATH = os.path.join(BASE_DIR, "data", "twcs", "labeled_twcs_20k.csv")
+DATA_PATH = os.path.join(BASE_DIR, "data", "twcs", "llm_labeled_5k.csv")
+TEXT_COLUMN = "first_customer_text"
 MODEL_DIR = os.path.join(BASE_DIR, "models", "twcs")
 MODEL_PATH = os.path.join(MODEL_DIR, "tfidf_twcs.pkl")
 METRICS_PATH = os.path.join(MODEL_DIR, "twcs_metrics.json")
@@ -62,8 +70,11 @@ def main():
 
     print(f"Loading TWCS dataset from: {DATA_PATH}")
     df = pd.read_csv(DATA_PATH)
+    if TEXT_COLUMN not in df.columns:
+        raise KeyError(f"Expected feature column {TEXT_COLUMN!r}; got {list(df.columns)}")
+    print(f"Feature column: {TEXT_COLUMN} | rows: {len(df):,d} | escalation rate: {df['escalated'].mean():.1%}")
 
-    X = df["customer_text"].fillna("").astype(str)
+    X = df[TEXT_COLUMN].fillna("").astype(str)
     y = df["escalated"].astype(int)
 
     # Stratified Train/Test Split (80/20)

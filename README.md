@@ -30,8 +30,9 @@ This project utilizes a two-dataset split to evaluate cross-domain generalizatio
 
 2. **Cross-Domain Evaluation Set: Customer Support on Twitter (TWCS)**
    - *Characteristics:* Real-world, noisy social media posts featuring slang, abbreviations, emojis, and typos.
-   - *Reconstruction:* programmatically woven into multi-turn threads by tracing parent-child reply relationships.
-   - *Labeling:* **LLM-Assisted (Google Gemini 1.5 Flash)**. Raw conversation threads are labeled by `gemini-1.5-flash` to build a high-quality, real-world validation ground truth.
+   - *Reconstruction:* Programmatically woven into multi-turn threads by tracing parent-child reply relationships.
+   - *LLM Labeling:* A **5,000-thread uniform random sample** (seed `20260729`, manifest `data/twcs/sample_pool_5000.txt`) is labeled **by an LLM**, one thread at a time, against the contract in [`src/twcs/prompts.py`](src/twcs/prompts.py).
+   - *What the Labeler Sees:* The customer's **opening message only** — no agent replies, no `turn_count`. This matches the feature column the downstream classifier receives, so no label carries information the model cannot see.
    - *Dual Role:* Beyond serving as the cross-domain evaluation set for the Bitext-trained models, this labeled TWCS data is **also** split 80/20 to train **in-domain reference models** (TF-IDF and DistilBERT) on target Twitter vocabulary. These establish the achievable upper bound when real-world labels *are* available, isolating how much of the cross-domain gap stems from vocabulary mismatch versus model architecture.
 
 ---
@@ -46,7 +47,8 @@ graph TD
 
     subgraph P2["Phase 2: Evaluation Prep (TWCS)"]
         A2[TWCS Raw CSV] -->|DFS Thread Reconstructor| B2[Conversation Threads]
-        B2 -->|LLM Auto-Labeler| C2[Binary Escalation Test Set]
+        B2 -->|Uniform Random Sample, seed 20260729| B3[5,000-Thread Manifest]
+        B3 -->|LLM Labeling against prompts.py| C2[Binary Escalation Test Set]
     end
 
     subgraph P3["Phase 3: Modeling & Evaluation"]
@@ -80,8 +82,40 @@ Out of the 27 Bitext intents, exactly 7 are designated as requiring human escala
 
 The remaining 20 intents (`track_order`, `recover_password`, `delivery_period`, `check_invoice`, etc.) represent static FAQ lookups or deterministic API operations suitable for automated self-service bots (`escalated = 0`).
 
+> ⚠️ **Two of those self-service mappings do not hold in the target domain.** In Bitext, `recover_password` and `check_invoice` are routine automated lookups. In real Twitter traffic the equivalent messages are *"my password is rejected and the 2FA code never arrives"* and *"you charged me twice, where is my money"* — cases that need a human. This label-space collision is the largest single source of cross-domain error we measured; see [Per-Category Cross-Domain Recall](#per-category-cross-domain-recall).
+
 ### 2. Thread Reconstruction & LLM Labeling (TWCS)
-We use a depth-first search (DFS) reply-chain parser to stitch together tweets into cohesive dialogues. An LLM acts as the evaluator to decide whether a customer thread requires a human escalation or could be handled by a bot.
+We use a depth-first search (DFS) reply-chain parser to stitch together tweets into cohesive dialogues. Each sampled thread is then labeled **by an LLM** against the triage contract in [`src/twcs/prompts.py`](src/twcs/prompts.py), which defines the 7 escalation categories, the self-service categories, and the severity bar for `complaint`.
+
+#### Why This Labeling Method
+
+The labels are produced by an LLM (`claude-opus-5`), recorded in the `labeler` column on every row: one thread at a time, in context, against a published contract and under human supervision of scope and tie-breaks. What that design buys:
+
+1. **Every label is auditable.** Each row carries a free-text `reason` grounded in the customer's wording, so any label can be re-argued from the record. A consensus run gives you a label and a vote count, not a rationale.
+2. **The contract is published and was refined against the data.** `prompts.py` holds the severity bar and category priority; `LABELING_CONVENTIONS.md` holds ~45 recurring tie-breaks, recorded as they were settled. Both were folded back into the prompt so the stated contract matches the labels that exist.
+3. **The confound is enforced structurally, not promised.** The harness emits worksheets containing only `thread_id` and the opening message. `turn_count`, agent replies and thread text were never present in the labeling context — not withheld by instruction, but absent from it.
+4. **It was verified rather than assumed.** Escalation rate by `turn_count` was checked after every batch, and drift audited at 2,300 and 5,000 rows.
+
+#### ⚠️ Threat to Validity: these labels are model output
+
+**The ground truth here is LLM judgment, not human judgment.** No human labeled any of the 5,000 threads. This benchmark therefore measures *whether a Bitext-trained lexical model reproduces LLM triage decisions made under a published contract* — not whether it reproduces human decisions.
+
+That is still a meaningful cross-domain test: the two models are of entirely different families (n-gram linear classifier vs. large language model), trained on different data, and the evaluation is genuinely out-of-domain. But the stronger claim — "generalization to human judgment" — is not supported by this evidence and should not be made.
+
+**What would support it:** a human-labeled subsample (200–300 threads drawn from the same manifest) scored against these labels with Cohen's κ. That would convert the LLM labels from *asserted* ground truth into a *calibrated* proxy with a measured agreement rate, and is the single highest-value next step for the writeup. It is not yet done.
+
+#### Guards Against the Length Confound
+`len(customer_text)` correlates with `turn_count` at **r = 0.819**, so verbosity is a back channel to thread length even when the metadata field is withheld. Two guards:
+- The prompt explicitly forbids escalating on volume, repetition, or follow-up count.
+- After every batch, `llm_label.py stats` reports escalation rate **by `turn_count`**. A steep monotonic climb means the confound bit.
+
+**Result across all 5,000 labels:** the curve is flat (28–34% across every stratum with n > 100), `corr(escalated, turn_count) = -0.006`, and the rule `turn_count >= 4` predicts the labels at **F1 0.337** — no better than the base rate. The labels are not a thread-length statistic.
+
+#### Consistency Across Sessions
+Hand labeling spans many sessions, so drift is the main threat to label quality. Three countermeasures:
+- [`src/twcs/LABELING_CONVENTIONS.md`](src/twcs/LABELING_CONVENTIONS.md) records every recurring tie-break — the severity bar, the profanity grammar rule, ~45 case types.
+- Every row carries a free-text `reason` grounded in the customer's wording, so any label can be re-argued later.
+- A drift audit at 2,300 labels grepped the phrase patterns whose rules had been tightened mid-run and found **3 misaligned labels (0.13%)**, which were corrected. The settled rules were then folded back into `prompts.py` so the stated contract matches the labels that exist.
 
 ### 3. Baseline Modeling
 A classic machine learning pipeline (TF-IDF + Logistic Regression) is trained on the Bitext dataset to establish a performance floor. We additionally train a second, **in-domain** TF-IDF + Logistic Regression baseline directly on TWCS (80/20 split) to measure the ceiling achievable with target-domain vocabulary.
@@ -122,23 +156,39 @@ We evaluated a class-balanced Logistic Regression classifier trained on bigram T
 ### Why Does the Linear Baseline Score So High?
 The Bitext dataset is synthetically generated with standardized entity placeholders (`{{Order Number}}`, `{{Customer Support Email}}`) and highly distinct lexical markers for each intent. A linear TF-IDF classifier easily separates these exact keyword patterns in-domain. 
 
-**Next Steps (Cross-Domain Generalization):** When deployed against unstructured, non-templated, noisy real-world tweets (Twitter Customer Support dataset), n-gram models suffer severe performance degradation. Below is our empirical benchmark quantifying this drop across our 20K labeled evaluation threads alongside our target-domain Twitter baseline:
+**Next Steps (Cross-Domain Generalization):** When deployed against unstructured, non-templated, noisy real-world tweets (Twitter Customer Support dataset), n-gram models suffer severe performance degradation. The benchmark below quantifies that drop against the LLM-labeled sample.
 
 ### 3. Cross-Domain Generalization Benchmark (`Bitext -> TWCS`)
-To quantify the vulnerability of surface-level lexical representations (`TF-IDF`), we evaluated our Bitext-trained baseline classifier directly against multi-turn dialogue threads from Twitter (`TWCS`), alongside an In-Domain Twitter baseline trained via an 80/20 split (`models/twcs/twcs_metrics.json`).
+
+To quantify the vulnerability of surface-level lexical representations (`TF-IDF`), we evaluated our Bitext-trained baseline classifier directly against the **5,000-thread LLM-labeled TWCS sample**, alongside an In-Domain Twitter baseline retrained on an 80/20 split of the same labels (`models/twcs/twcs_metrics.json`). Both use `first_customer_text` — the customer's opening message, exactly what the LLM labeler saw.
 
 | Metric | Bitext (In-Domain Ceiling) | TWCS In-Domain (80/20 Split) | TWCS Cross-Domain (Bitext -> Twitter) | Generalization Drop (Clean vs. Cross) |
 | :--- | :---: | :---: | :---: | :---: |
-| **Macro F1-Score** | **0.9964** | **0.8120** | **0.5444** | **-0.4520** |
-| **ROC-AUC** | 0.9999 | 0.8963 | 0.5462 | -0.4537 |
-| **Accuracy** | 0.9980 | 0.8123 | 0.5975 | -0.4005 |
-| **Precision (Macro)** | 0.9964 | 0.8120 | 0.5901 | -0.4063 |
-| **Recall (Macro)** | 0.9964 | 0.8132 | 0.5592 | -0.4372 |
-| **Inference Latency** | **0.1293 ms/query** | **0.2396 ms/query** | **0.2232 ms/query** | **+0.0939 ms/query** |
+| **Macro F1-Score** | **0.9964** | **0.7327** | **0.5816** | **-0.4148** |
+| ROC-AUC | 0.9999 | 0.8258 | 0.5811 | -0.4188 |
+| Accuracy | 0.9980 | 0.7640 | 0.6604 | -0.3376 |
+| Precision (Macro) | 0.9964 | 0.7264 | 0.5874 | -0.4090 |
+| Recall (Macro) | 0.9964 | 0.7432 | 0.5792 | -0.4172 |
+
+### Per-Category Cross-Domain Recall
+
+A single F1 hides the mechanism. Because each escalated thread carries its Bitext intent, we can see which intents survive the shift:
+
+| Escalation intent | Threads | Cross-domain recall |
+| :--- | :---: | :---: |
+| `check_cancellation_fee` | 18 | **0.72** |
+| `contact_human_agent` | 65 | 0.60 |
+| `get_refund` | 112 | 0.52 |
+| `contact_customer_service` | 169 | 0.52 |
+| `payment_issue` | 281 | 0.35 |
+| `complaint` | 759 | 0.32 |
+| `registration_problems` | 125 | **0.20** |
 
 **Key Benchmarking Takeaways:**
-- **Lexical Overfitting & Domain Shift:** The linear n-gram model drops by over **45 percentage points** in Macro F1 when transitioned from structured instructions (`Bitext`) to noisy social media threads (`TWCS`). Without semantic abstraction, TF-IDF cannot recognize that slang (`wtf`, `sux`, `pls help`) or multi-turn conversational patterns map to the exact same customer intents trained in Bitext.
-- **In-Domain Twitter Floor vs. Architectural Ceiling (`0.8120` F1):** When a TF-IDF + Logistic Regression pipeline is trained directly on target Twitter vocabulary (`models/twcs/twcs_metrics.json`), Macro F1 rebounds significantly to `0.8120` (`+26.76%`). This proves that vocabulary mismatch accounts for roughly half of the cross-domain degradation. However, linear TF-IDF still hits a hard ceiling at `0.8120` (`430 False Negatives`), showing that deep contextual representations (**DistilBERT**) are required to capture multi-turn dialogue progression and negation across channels.
+- **Lexical Overfitting & Domain Shift:** The linear n-gram model drops **41 percentage points** in Macro F1 moving from structured instructions (`Bitext`) to noisy social media threads (`TWCS`). Without semantic abstraction, TF-IDF cannot recognise that slang (`wtf`, `sux`, `pls help`) maps to the intents it trained on.
+- **Vocabulary mismatch explains ~15 points, not half the gap.** Retraining on target-domain vocabulary buys `+0.1511` F1 (`0.5816 -> 0.7327`). The remaining `0.2637` to the synthetic ceiling is an architectural limit, not a vocabulary one.
+- **The in-domain ceiling is `0.7327`.** Because the labels carry no thread-length signal, this figure reflects what a linear n-gram model can extract from the customer's opening message alone — no credit for learning to count turns.
+- **The worst failures are a taxonomy collision, not just noise.** `registration_problems` (0.20) and `payment_issue` (0.35) are *functional* intents with distinctive vocabulary and should have been easy. They fail because Bitext maps `recover_password` and `check_invoice` to **self-service (0)**, while in real Twitter traffic a lockout or a missing payment is exactly what needs a human. The model matches the words correctly and applies the wrong rule. The two categories a support desk can least afford to misroute — locked-out users and missing money — are the two this baseline is worst at catching.
 
 As **future development**, we fine-tune **DistilBERT** (`distilbert-base-uncased`) to overcome this lexical brittleness and establish robust cross-domain classification.
 
@@ -171,11 +221,12 @@ human-loop/
 │   ├── twcs/                   # Target domain (TWCS) pipeline
 │   │   ├── __init__.py
 │   │   ├── reconstruct_conversations.py # Weaves raw tweets into thread sequences
-│   │   ├── autonomous_labeler.py   # Autonomous batch labeling engine with checkpointing & rate limits
-│   │   ├── label_twcs.py           # LLM auto-labeler execution script for TWCS evaluation threads
-│   │   └── train_twcs.py           # Pipeline for TF-IDF in-domain training on TWCS (80/20 split)
+│   │   ├── prompts.py              # THE LABELING CONTRACT: 7-category taxonomy, severity bar, confound notes
+│   │   ├── llm_label.py         # LLM labeling harness: sample / next / ingest / stats
+│   │   ├── LABELING_CONVENTIONS.md # Recurring tie-breaks, kept consistent across sessions
+│   │   ├── train_twcs.py           # In-domain TF-IDF baseline on llm_labeled_5k.csv (80/20)
 │   └── evaluate.py             # Cross-domain benchmarking & metrics computation
-├── app.py                      # Interactive Streamlit Demo
+├── app.py                      # Interactive Streamlit demo & label review UI
 ├── requirements.txt            # Python dependencies
 └── README.md                   # Project documentation
 ```
@@ -188,8 +239,9 @@ human-loop/
 - [src/bitext/preprocess_bitext.py](file:///Users/weirui/dev/human-loop/src/bitext/preprocess_bitext.py)
 - [src/bitext/train_bitext.py](file:///Users/weirui/dev/human-loop/src/bitext/train_bitext.py)
 - [src/twcs/reconstruct_conversations.py](file:///Users/weirui/dev/human-loop/src/twcs/reconstruct_conversations.py)
-- [src/twcs/autonomous_labeler.py](file:///Users/weirui/dev/human-loop/src/twcs/autonomous_labeler.py)
-- [src/twcs/label_twcs.py](file:///Users/weirui/dev/human-loop/src/twcs/label_twcs.py)
+- [src/twcs/prompts.py](file:///Users/weirui/dev/human-loop/src/twcs/prompts.py)
+- [src/twcs/llm_label.py](file:///Users/weirui/dev/human-loop/src/twcs/llm_label.py)
+- [src/twcs/LABELING_CONVENTIONS.md](file:///Users/weirui/dev/human-loop/src/twcs/LABELING_CONVENTIONS.md)
 - [src/twcs/train_twcs.py](file:///Users/weirui/dev/human-loop/src/twcs/train_twcs.py)
 - [src/evaluate.py](file:///Users/weirui/dev/human-loop/src/evaluate.py)
 
@@ -202,7 +254,7 @@ The full analysis, visualizations, and results are already captured in the two n
 | Notebook | What's Inside |
 | :--- | :--- |
 | **[01_bitext_baseline_modeling.ipynb](notebooks/01_bitext_baseline_modeling.ipynb)** | EDA, data cleaning, feature engineering, and the in-domain TF-IDF + Logistic Regression baseline on the Bitext dataset (`F1 = 0.9964`). |
-| **[02_twcs_baseline_modeling.ipynb](notebooks/02_twcs_baseline_modeling.ipynb)** | TWCS thread reconstruction, LLM labeling review, and the cross-domain vs. in-domain generalization benchmark (`0.5444` cross-domain vs. `0.8120` in-domain F1). |
+| **[02_twcs_baseline_modeling.ipynb](notebooks/02_twcs_baseline_modeling.ipynb)** | TWCS thread reconstruction, the confound check, and the cross-domain vs. in-domain benchmark on the LLM-labeled sample (`0.5816` cross-domain vs. `0.7327` in-domain F1), plus per-category recall. |
 
 *Optional — to run the notebooks locally, install the dependencies first:*
 ```bash

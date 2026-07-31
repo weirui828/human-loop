@@ -22,10 +22,13 @@ def parse_int_id(val: str) -> int | None:
     except ValueError:
         return None
 
-def reconstruct_threads(csv_path: str) -> List[List[Dict[str, Any]]]:
+def reconstruct_threads(csv_path: str, deduplicate_roots: bool = True) -> List[List[Dict[str, Any]]]:
     """
     Parses a customer support twitter CSV and reconstructs all conversation paths/threads.
     Uses only Python standard library (no pandas needed).
+    
+    If deduplicate_roots is True (default), prunes sub-branching by keeping the single most comprehensive 
+    (longest / maximum turn count) thread path per root conversation tree.
     
     Returns a list of threads, where each thread is a list of tweet dictionaries in chronological order.
     """
@@ -58,29 +61,56 @@ def reconstruct_threads(csv_path: str) -> List[List[Dict[str, Any]]]:
     root_ids.sort()
 
     threads: List[List[Dict[str, Any]]] = []
-    
-    def dfs(current_id: int, current_path: List[Dict[str, Any]], visited: Set[int]):
-        """Recursively traverse reply chains using Depth-First Search."""
-        if current_id in visited:
-            threads.append(current_path.copy())
-            return
-            
-        visited.add(current_id)
-        tweet = tweets[current_id]
-        new_path = current_path + [tweet]
-        
-        children = [cid for cid in tweet["response_tweet_ids"] if cid in tweets]
-        
-        if not children:
-            threads.append(new_path)
-        else:
-            for child_id in children:
-                dfs(child_id, new_path, visited.copy())
+    seen_texts: Set[str] = set()
 
     for root_id in root_ids:
-        dfs(root_id, [], set())
+        root_paths: List[List[Dict[str, Any]]] = []
         
+        def dfs(current_id: int, current_path: List[Dict[str, Any]], visited: Set[int]):
+            """Recursively traverse reply chains using Depth-First Search."""
+            if current_id in visited:
+                root_paths.append(current_path.copy())
+                return
+                
+            visited.add(current_id)
+            tweet = tweets[current_id]
+            new_path = current_path + [tweet]
+            
+            children = [cid for cid in tweet["response_tweet_ids"] if cid in tweets]
+            
+            if not children:
+                root_paths.append(new_path)
+            else:
+                for child_id in children:
+                    dfs(child_id, new_path, visited.copy())
+
+        dfs(root_id, [], set())
+
+        if not root_paths:
+            continue
+
+        if deduplicate_roots:
+            # Sort paths for this root: longest total turns first, then max customer turns, then latest tweet ID
+            root_paths.sort(
+                key=lambda p: (
+                    len(p),
+                    sum(1 for t in p if t["inbound"]),
+                    p[-1]["tweet_id"]
+                ),
+                reverse=True
+            )
+            best_path = root_paths[0]
+            
+            # Avoid exact identical thread text duplicates across distinct root tweets if any
+            thread_text_key = "\n".join(f"{t['author_id']}:{t['text']}" for t in best_path)
+            if thread_text_key not in seen_texts:
+                seen_texts.add(thread_text_key)
+                threads.append(best_path)
+        else:
+            threads.extend(root_paths)
+
     return threads
+
 
 def print_threads(threads: List[List[Dict[str, Any]]], limit: int = 5):
     """Utility to print threads in a human-readable format."""
@@ -113,12 +143,17 @@ def format_thread(thread: List[Dict[str, Any]], index: int) -> Dict[str, Any]:
             
     customer_text = " ".join(customer_utterances)
     full_thread_text = "\n".join(full_turns)
-    
+    # Intake-triage label/feature unit: what the customer said on arrival, before
+    # any agent reply. Later turns exist because the first handling attempt
+    # failed, so they leak the outcome we want to predict.
+    first_customer_text = customer_utterances[0] if customer_utterances else ""
+
     return {
         "thread_id": thread_id,
         "root_tweet_id": root_tweet_id,
         "turn_count": len(thread),
         "customer_turn_count": len(customer_utterances),
+        "first_customer_text": first_customer_text,
         "customer_text": customer_text,
         "full_thread_text": full_thread_text,
         "raw_turns": thread
@@ -136,7 +171,8 @@ def save_threads_to_file(threads: List[List[Dict[str, Any]]], output_csv: str, o
         
     # Save CSV
     with open(output_csv, mode='w', encoding='utf-8', newline='') as f:
-        fieldnames = ["thread_id", "root_tweet_id", "turn_count", "customer_turn_count", "customer_text", "full_thread_text"]
+        fieldnames = ["thread_id", "root_tweet_id", "turn_count", "customer_turn_count",
+                      "first_customer_text", "customer_text", "full_thread_text"]
         writer = csv.DictWriter(f, fieldnames=fieldnames)
         writer.writeheader()
         for item in formatted_threads:
@@ -159,6 +195,7 @@ if __name__ == "__main__":
     parser.add_argument("--input", type=str, help="Path to input CSV file (`twcs.csv` or `sample.csv`).")
     parser.add_argument("--limit", type=int, help="Maximum number of threads to serialize (default: 50000 for twcs.csv). Set 0 for all.")
     parser.add_argument("--full", action="store_true", help="Process all threads without limit and save to `reconstructed_threads_full.csv/.json`.")
+    parser.add_argument("--allow-branches", action="store_true", help="Allow extracting all sub-branches per root tweet (default: false, keeps single longest path per root).")
     parser.add_argument("--out-csv", type=str, help="Custom output path for CSV.")
     parser.add_argument("--out-json", type=str, help="Custom output path for JSON.")
     
@@ -181,7 +218,9 @@ if __name__ == "__main__":
     if not os.path.exists(csv_file):
         print(f"Input file not found at {csv_file}")
     else:
-        print(f"Reconstructing threads from {csv_file}...")
-        all_threads = reconstruct_threads(csv_file)
+        dedup = not args.allow_branches
+        mode_str = "deduplicated (1 path per root)" if dedup else "all sub-branches"
+        print(f"Reconstructing threads from {csv_file} [{mode_str}]...")
+        all_threads = reconstruct_threads(csv_file, deduplicate_roots=dedup)
         print_threads(all_threads, limit=3)
         save_threads_to_file(all_threads, out_csv, out_json, limit=limit)

@@ -31,8 +31,32 @@ from sklearn.pipeline import Pipeline
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 MODEL_PATH = os.path.join(BASE_DIR, "models", "bitext", "tfidf_bitext.pkl")
 BITEXT_METRICS_PATH = os.path.join(BASE_DIR, "models", "bitext", "bitext_metrics.json")
-TWCS_TEST_PATH = os.path.join(BASE_DIR, "data", "twcs", "labeled_twcs_20k.csv")
+TWCS_TEST_PATH = os.path.join(BASE_DIR, "data", "twcs", "llm_labeled_5k.csv")
 OUTPUT_METRICS_PATH = os.path.join(BASE_DIR, "models", "cross_domain_metrics.json")
+
+# The labeler judged the customer's OPENING message only (see src/twcs/prompts.py).
+# Feeding the model `customer_text` (every customer turn concatenated) would hand it
+# information the labeler never saw, and would reintroduce the length confound:
+# len(customer_text) correlates with turn_count at r=0.819 versus r=0.065 for the
+# opening message. Prefer the opening-message column wherever it exists.
+TEXT_COLUMN_PREFERENCE = ("first_customer_text", "customer_text")
+
+
+def resolve_text_column(df: pd.DataFrame) -> str:
+    """Picks the customer-text feature column, preferring the opening message."""
+    for column in TEXT_COLUMN_PREFERENCE:
+        if column in df.columns:
+            if column == "customer_text":
+                print(
+                    "NOTE: using `customer_text` (all customer turns concatenated). "
+                    "Labels were assigned from the opening message alone, so the model "
+                    "is being given text the labeler did not see."
+                )
+            return column
+    raise KeyError(
+        f"No customer-text column found. Expected one of {TEXT_COLUMN_PREFERENCE}; "
+        f"got {list(df.columns)}"
+    )
 
 
 def benchmark_latency(model: Pipeline, sample_texts: list, n_iterations: int = 500) -> float:
@@ -68,19 +92,23 @@ def run_evaluation(full: bool = False, input_path: str = None, output_path: str 
         return
         
     if not os.path.exists(test_file):
-        print(f"Error: TWCS test set not found at {test_file}. Run src/twcs/label_twcs.py first.")
+        print(f"Error: TWCS test set not found at {test_file}.")
+        print("  Labels are produced via `python -m src.twcs.llm_label`.")
         return
 
     print("Loading Bitext baseline model and metrics...")
     model = joblib.load(MODEL_PATH)
-    
+
     with open(BITEXT_METRICS_PATH, "r", encoding="utf-8") as f:
         bitext_metrics = json.load(f)["metrics"]
 
     print(f"Loading labeled Twitter Customer Support (TWCS) dataset from {test_file}...")
     df_twcs = pd.read_csv(test_file)
-    
-    X_test_customer = df_twcs["customer_text"].fillna("")
+
+    text_column = resolve_text_column(df_twcs)
+    print(f"Using feature column: {text_column}  (n={len(df_twcs)})")
+
+    X_test_customer = df_twcs[text_column].fillna("")
     y_test = df_twcs["escalated"].astype(int)
     
     # 1. Evaluate Cross-Domain Performance (Bitext-trained model on Twitter data)
