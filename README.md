@@ -31,7 +31,7 @@ This project utilizes a two-dataset split to evaluate cross-domain generalizatio
 2. **Cross-Domain Evaluation Set: Customer Support on Twitter (TWCS)**
    - *Characteristics:* Real-world, noisy social media posts featuring slang, abbreviations, emojis, and typos.
    - *Reconstruction:* Programmatically woven into multi-turn threads by tracing parent-child reply relationships.
-   - *LLM Labeling:* A **5,000-thread uniform random sample** (seed `20260729`, manifest `data/twcs/sample_pool_5000.txt`) is labeled **by an LLM**, one thread at a time, against the contract in [`src/twcs/prompts.py`](src/twcs/prompts.py).
+   - *LLM Labeling:* A **5,000-thread uniform random sample** is labeled **by an LLM**, one thread at a time, against a published triage contract defining the 7 escalation categories.
    - *What the Labeler Sees:* The customer's **opening message only** — no agent replies, no `turn_count`. This matches the feature column the downstream classifier receives, so no label carries information the model cannot see.
    - *Dual Role:* Beyond serving as the cross-domain evaluation set for the Bitext-trained models, this labeled TWCS data is **also** split 80/20 to train **in-domain reference models** (TF-IDF and DistilBERT) on target Twitter vocabulary. These establish the achievable upper bound when real-world labels *are* available, isolating how much of the cross-domain gap stems from vocabulary mismatch versus model architecture.
 
@@ -47,7 +47,7 @@ graph TD
 
     subgraph P2["Phase 2: Evaluation Prep (TWCS)"]
         A2[TWCS Raw CSV] -->|Thread Reconstruction| B2[Conversation Threads]
-        B2 -->|Uniform Random Sample, seed 20260729| B3[5,000-Thread Manifest]
+        B2 -->|Uniform Random Sample| B3[5,000-Thread Manifest]
         B3 -->|LLM Labeling against prompts.py| C2[Binary Escalation Test Set]
     end
 
@@ -85,7 +85,7 @@ The remaining 20 intents (`track_order`, `recover_password`, `delivery_period`, 
 > ⚠️ **Two of those self-service mappings do not hold in the target domain.** In Bitext, `recover_password` and `check_invoice` are routine automated lookups. In real Twitter traffic the equivalent messages are *"my password is rejected and the 2FA code never arrives"* and *"you charged me twice, where is my money"* — cases that need a human. This label-space collision is the largest single source of cross-domain error we measured; see [Per-Category Cross-Domain Recall](#per-category-cross-domain-recall).
 
 ### 2. Thread Reconstruction & LLM Labeling (TWCS)
-Raw tweets are stitched into multi-turn dialogues by following parent-child reply links. A **5,000-thread uniform random sample**  is then labeled by an LLM (`claude-opus-5`), one thread at a time, against the triage contract in [`src/twcs/prompts.py`](src/twcs/prompts.py) — the 7 escalation categories, the self-service categories, and the severity bar for `complaint`. The labeler sees the customer's **opening message only**: no agent replies. Every row records a free-text `reason`, so any label can be re-argued from the record.
+Raw tweets are stitched into multi-turn dialogues by following parent-child reply links. A **5,000-thread uniform random sample** is then labeled by an LLM (`claude-opus-5`), one thread at a time, against a published triage contract — the 7 escalation categories, the self-service categories, and the severity bar for `complaint`. The labeler sees the customer's **opening message only**: no agent replies. Every row records a free-text `reason`, so any label can be re-argued from the record.
 
 > These labels are generated entirely by `claude-opus-5`. Given that the downstream models under evaluation are TF-IDF and DistilBERT, a frontier LLM provides a sufficiently reliable ground truth for this comparison. The Streamlit dashboard includes a human audit interface for reviewing and correcting labels to further strengthen the dataset.
 
@@ -184,20 +184,8 @@ human-loop/
 ├── notebooks/                  # Jupyter notebooks for EDA and experimentation
 │   ├── 01_bitext_baseline_modeling.ipynb # Primary EDA & baseline modeling notebook
 │   └── 02_twcs_baseline_modeling.ipynb # TWCS thread reconstruction & cross-domain evaluation
-├── src/                        # Core codebase
-│   ├── __init__.py
-│   ├── bitext/                 # Source domain (Bitext) pipeline
-│   │   ├── __init__.py
-│   │   ├── preprocess_bitext.py    # Rule-based intent-to-escalate mapper & feature engineer
-│   │   └── train_bitext.py         # Pipeline for TF-IDF baseline training on Bitext
-│   ├── twcs/                   # Target domain (TWCS) pipeline
-│   │   ├── __init__.py
-│   │   ├── reconstruct_conversations.py # Weaves raw tweets into thread sequences
-│   │   ├── prompts.py              # THE LABELING CONTRACT: 7-category taxonomy, severity bar, confound notes
-│   │   ├── llm_label.py         # LLM labeling harness: sample / next / ingest / stats
-│   │   ├── LABELING_CONVENTIONS.md # Recurring tie-breaks, kept consistent across sessions
-│   │   ├── train_twcs.py           # In-domain TF-IDF baseline on llm_labeled_5k.csv (80/20)
-│   └── evaluate.py             # Cross-domain benchmarking & metrics computation
+├── docs/                       # Screenshots and documentation assets
+│   └── ui.png
 ├── app.py                      # Interactive Streamlit demo & label review UI
 ├── requirements.txt            # Python dependencies
 └── README.md                   # Project documentation
@@ -236,10 +224,7 @@ The app opens two tabs:
 ![Dashboard — Live Triage Simulator](docs/ui.png)
 
 > [!NOTE]
-> The triage model must exist before the simulator tab works. If it's missing, train it first:
-> ```bash
-> python src/twcs/train_twcs.py
-> ```
+> The triage model must exist before the simulator tab works. If it's missing, train it via the code in **Notebook 02**.
 
 ---
 
