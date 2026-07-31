@@ -242,3 +242,9 @@ data/twcs/reconstructed_threads_20k.json
 # and is equally unreproducible, but it is deliberately untracked: it is not
 # part of the uniform sample and must not be mixed into base-rate or evaluation
 # figures. Back it up outside the repo.
+
+# Labeling infrastructure (internal tooling, not project deliverables)
+src/twcs/llm_label.py
+src/twcs/prompts.py
+src/twcs/reconstruct_conversations.py
+src/twcs/LABELING_CONVENTIONS.md
