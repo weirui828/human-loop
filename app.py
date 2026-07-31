@@ -23,9 +23,13 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# Custom CSS for Modern Dark/Glassmorphic Aesthetics
+# Custom CSS — Warm Light Theme
 st.markdown("""
 <style>
+    /* Global warm cream background */
+    .stApp {
+        background-color: #FDF5EE;
+    }
     .block-container {
         max-width: 1280px;
         padding-top: 1rem;
@@ -33,71 +37,145 @@ st.markdown("""
     header[data-testid="stHeader"] {
         display: none;
     }
+
+    /* Header gradient — macaron blue/green */
     .main-header {
-        font-size: 2.2rem;
+        font-size: 2.4rem;
         font-weight: 700;
-        background: linear-gradient(90deg, #4F46E5, #9333EA, #EC4899);
+        line-height: 1.2;
+        background: linear-gradient(135deg, #7EC8C8, #8BBFAA, #A8D8D0);
         -webkit-background-clip: text;
         -webkit-text-fill-color: transparent;
-        margin-bottom: 0.5rem;
+        margin-bottom: 0.25rem;
     }
     .sub-header {
         font-size: 1.05rem;
-        color: #9CA3AF;
+        color: #8AADA8;
         margin-bottom: 1.5rem;
     }
+
+    /* Content card wrapper */
+    .content-card {
+        background-color: #FFFFFF;
+        border-radius: 18px;
+        padding: 2rem 2.25rem;
+        box-shadow: 0 2px 16px rgba(126, 200, 200, 0.10);
+        margin-bottom: 1.5rem;
+    }
+
+    /* Metric cards for audit tab */
     .metric-card {
-        background-color: rgba(31, 41, 55, 0.7);
-        border: 1px solid rgba(75, 85, 99, 0.4);
+        background-color: #FFFFFF;
+        border: 1px solid rgba(126, 200, 200, 0.2);
         border-radius: 12px;
         padding: 1.25rem;
         text-align: center;
-        backdrop-filter: blur(8px);
+        box-shadow: 0 1px 6px rgba(126, 200, 200, 0.08);
     }
     .metric-value {
         font-size: 2rem;
         font-weight: 800;
-        color: #F3F4F6;
+        color: #3A5A5A;
     }
     .metric-label {
         font-size: 0.85rem;
-        color: #9CA3AF;
+        color: #8AADA8;
         text-transform: uppercase;
         letter-spacing: 0.05em;
     }
-    .divergence-box {
-        background-color: rgba(239, 68, 68, 0.1);
-        border: 1px solid rgba(239, 68, 68, 0.4);
-        border-radius: 10px;
-        padding: 1rem;
-        margin-bottom: 1rem;
-    }
+
+    /* LLM verdict cards */
     .llm-card-gemini {
-        background-color: rgba(59, 130, 246, 0.1);
-        border: 1px solid rgba(59, 130, 246, 0.4);
+        background-color: rgba(126, 200, 200, 0.08);
+        border: 1px solid rgba(126, 200, 200, 0.25);
         border-radius: 10px;
         padding: 1rem;
     }
     .llm-card-anthropic {
-        background-color: rgba(168, 85, 247, 0.1);
-        border: 1px solid rgba(168, 85, 247, 0.4);
+        background-color: rgba(168, 85, 247, 0.06);
+        border: 1px solid rgba(168, 85, 247, 0.2);
         border-radius: 10px;
         padding: 1rem;
     }
+
+    /* Chat bubbles */
     .chat-bubble-customer {
-        background-color: rgba(99, 102, 241, 0.12);
-        border-left: 4px solid #6366F1;
+        background-color: rgba(126, 200, 200, 0.08);
+        border-left: 4px solid #7EC8C8;
         padding: 0.75rem 1rem;
         border-radius: 8px;
         margin-bottom: 0.5rem;
     }
     .chat-bubble-agent {
-        background-color: rgba(31, 41, 55, 0.8);
-        border-left: 4px solid #10B981;
+        background-color: rgba(139, 191, 170, 0.08);
+        border-left: 4px solid #8BBFAA;
         padding: 0.75rem 1rem;
         border-radius: 8px;
         margin-bottom: 0.5rem;
     }
+
+    /* Gradient analyze button */
+    div.stButton > button[kind="primary"],
+    div.stButton > button {
+        background: linear-gradient(90deg, #7EC8C8, #8BBFAA) !important;
+        color: white !important;
+        border: none !important;
+        border-radius: 12px !important;
+        padding: 0.65rem 1.5rem !important;
+        font-weight: 600 !important;
+        font-size: 1rem !important;
+        transition: opacity 0.2s !important;
+    }
+    div.stButton > button:hover {
+        opacity: 0.88 !important;
+    }
+
+    /* Result cards */
+    .result-card-escalated {
+        background-color: rgba(230, 150, 150, 0.15);
+        border-radius: 14px;
+        padding: 1rem 1.25rem;
+        margin-top: 0.75rem;
+        display: flex;
+        align-items: flex-start;
+        gap: 0.75rem;
+    }
+    .result-card-safe {
+        background-color: rgba(126, 200, 200, 0.12);
+        border-radius: 14px;
+        padding: 1rem 1.25rem;
+        margin-top: 0.75rem;
+        display: flex;
+        align-items: flex-start;
+        gap: 0.75rem;
+    }
+    .result-icon {
+        font-size: 1.5rem;
+        line-height: 1;
+        flex-shrink: 0;
+        margin-top: 0.15rem;
+    }
+    .result-title {
+        font-weight: 700;
+        font-size: 1.05rem;
+        color: #3A5A5A;
+        margin-bottom: 0.15rem;
+    }
+    .result-confidence {
+        font-size: 0.9rem;
+        color: #8AADA8;
+    }
+
+    /* Dropdown / selectbox styling */
+    div[data-baseweb="select"] > div {
+        background-color: rgba(126, 200, 200, 0.10) !important;
+        border-color: rgba(126, 200, 200, 0.30) !important;
+        border-radius: 10px !important;
+    }
+    div[data-baseweb="popover"] ul {
+        background-color: #F2FAF8 !important;
+    }
+
 </style>
 """, unsafe_allow_html=True)
 
@@ -128,7 +206,7 @@ ESCALATION_CATEGORIES = [
 ALL_CATEGORIES = ESCALATION_CATEGORIES + ["self_service"]
 
 st.markdown('<div class="main-header">Human-in-the-Loop: Escalation Classifier & Label Audit</div>', unsafe_allow_html=True)
-st.markdown('<div class="sub-header">Cross-Domain Customer Support Evaluation & Interactive Human Audit Dashboard</div>', unsafe_allow_html=True)
+st.markdown('<div class="sub-header">Cross-domain customer support evaluation & interactive human audit dashboard</div>', unsafe_allow_html=True)
 
 tab1, tab2 = st.tabs(["🤖 Live Triage Simulator", "👥 Human Label Audit"])
 
@@ -165,9 +243,25 @@ with tab1:
             is_escalated = bool(prediction == 1)
             confidence = probabilities[1] if is_escalated else probabilities[0]
             if is_escalated:
-                st.error(f"🚨 **Escalation Required** — Class 1 (Human Agent Needed) · Confidence: **{confidence*100:.1f}%**")
+                st.markdown(f"""
+                <div class="result-card-escalated">
+                    <div class="result-icon">🚨</div>
+                    <div>
+                        <div class="result-title">Escalation Required — Class 1 (Human Agent Needed)</div>
+                        <div class="result-confidence">Confidence: {confidence*100:.1f}%</div>
+                    </div>
+                </div>
+                """, unsafe_allow_html=True)
             else:
-                st.success(f"🤖 **Bot Eligible** — Class 0 (Self-Service / FAQ) · Confidence: **{confidence*100:.1f}%**")
+                st.markdown(f"""
+                <div class="result-card-safe">
+                    <div class="result-icon">🤖</div>
+                    <div>
+                        <div class="result-title">Bot Eligible — Class 0 (Self-Service / FAQ)</div>
+                        <div class="result-confidence">Confidence: {confidence*100:.1f}%</div>
+                    </div>
+                </div>
+                """, unsafe_allow_html=True)
 
 # ==============================================================================
 # TAB 2: HUMAN LABEL AUDIT
@@ -258,7 +352,7 @@ with tab2:
             nav_prev, nav_select, nav_next = st.columns([1, 6, 1])
             with nav_prev:
                 st.markdown("<br>", unsafe_allow_html=True)
-                st.button("⬅ Prev", use_container_width=True, key="nav_prev",
+                st.button("⬅", use_container_width=True, key="nav_prev",
                           disabled=(idx == 0), on_click=_go_prev)
             with nav_select:
                 selected_tid = st.selectbox(
@@ -268,7 +362,7 @@ with tab2:
                 )
             with nav_next:
                 st.markdown("<br>", unsafe_allow_html=True)
-                st.button("Next ➡", use_container_width=True, key="nav_next",
+                st.button("➡", use_container_width=True, key="nav_next",
                           disabled=(idx >= len(thread_ids) - 1), on_click=_go_next)
             row = df_llm[df_llm["thread_id"] == selected_tid].iloc[0]
             tid_str = str(selected_tid)
@@ -296,13 +390,17 @@ with tab2:
 
             with col_llm:
                 st.markdown("#### 🤖 LLM Verdict")
-                st.markdown('<div class="llm-card-gemini">', unsafe_allow_html=True)
                 if llm_esc == 1:
-                    st.markdown('<div class="metric-value" style="color: #EF4444; font-size: 1.4rem;">🚨 Escalated (1)</div>', unsafe_allow_html=True)
+                    verdict_html = '<div class="metric-value" style="color: #E69696; font-size: 1.4rem;">🚨 Escalated (1)</div>'
                 else:
-                    st.markdown('<div class="metric-value" style="color: #10B981; font-size: 1.4rem;">🤖 Self-Service (0)</div>', unsafe_allow_html=True)
-                st.markdown(f'<div class="metric-label">Category: <code>{llm_cat}</code></div>', unsafe_allow_html=True)
-                st.markdown('</div>', unsafe_allow_html=True)
+                    verdict_html = '<div class="metric-value" style="color: #7EC8C8; font-size: 1.4rem;">🤖 Self-Service (0)</div>'
+                st.markdown(
+                    f'<div class="llm-card-gemini">'
+                    f'{verdict_html}'
+                    f'<div class="metric-label">Category: <code>{llm_cat}</code></div>'
+                    f'</div>',
+                    unsafe_allow_html=True
+                )
 
                 st.markdown(f"**Reason:** {llm_reason}")
                 st.markdown(f"**Labeler:** `{row.get('labeler', 'N/A')}`")

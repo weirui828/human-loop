@@ -231,20 +231,6 @@ human-loop/
 └── README.md                   # Project documentation
 ```
 
-### File Reference Quicklinks:
-- [README.md](file:///Users/weirui/dev/human-loop/README.md)
-- [notebooks/01_bitext_baseline_modeling.ipynb](file:///Users/weirui/dev/human-loop/notebooks/01_bitext_baseline_modeling.ipynb)
-- [notebooks/02_twcs_baseline_modeling.ipynb](file:///Users/weirui/dev/human-loop/notebooks/02_twcs_baseline_modeling.ipynb)
-- [app.py](file:///Users/weirui/dev/human-loop/app.py)
-- [src/bitext/preprocess_bitext.py](file:///Users/weirui/dev/human-loop/src/bitext/preprocess_bitext.py)
-- [src/bitext/train_bitext.py](file:///Users/weirui/dev/human-loop/src/bitext/train_bitext.py)
-- [src/twcs/reconstruct_conversations.py](file:///Users/weirui/dev/human-loop/src/twcs/reconstruct_conversations.py)
-- [src/twcs/prompts.py](file:///Users/weirui/dev/human-loop/src/twcs/prompts.py)
-- [src/twcs/llm_label.py](file:///Users/weirui/dev/human-loop/src/twcs/llm_label.py)
-- [src/twcs/LABELING_CONVENTIONS.md](file:///Users/weirui/dev/human-loop/src/twcs/LABELING_CONVENTIONS.md)
-- [src/twcs/train_twcs.py](file:///Users/weirui/dev/human-loop/src/twcs/train_twcs.py)
-- [src/evaluate.py](file:///Users/weirui/dev/human-loop/src/evaluate.py)
-
 ---
 
 ## 📓 Explore the Notebooks
