@@ -220,38 +220,42 @@ with tab2:
         else:
             thread_ids = df_view["thread_id"].tolist()
 
-            # Determine current index from session state
-            if "audit_idx" not in st.session_state:
-                st.session_state["audit_idx"] = 0
-            # Clamp index to valid range
-            idx = st.session_state["audit_idx"]
-            if idx >= len(thread_ids):
-                idx = len(thread_ids) - 1
-            if idx < 0:
-                idx = 0
+            # The selectbox's own key is the single source of truth for the
+            # current thread. Reset it if it points outside the current view
+            # (e.g. the filter changed and dropped the previously-selected id).
+            if (
+                "audit_thread_select" not in st.session_state
+                or st.session_state["audit_thread_select"] not in thread_ids
+            ):
+                st.session_state["audit_thread_select"] = thread_ids[0]
+            idx = thread_ids.index(st.session_state["audit_thread_select"])
+
+            # Prev/Next mutate the selectbox key directly. on_click callbacks run
+            # before the rerun, so the selectbox picks up the new value instead of
+            # its stale stored one (a plain `index=` arg would be ignored here).
+            def _go_prev():
+                cur = thread_ids.index(st.session_state["audit_thread_select"])
+                st.session_state["audit_thread_select"] = thread_ids[max(0, cur - 1)]
+
+            def _go_next():
+                cur = thread_ids.index(st.session_state["audit_thread_select"])
+                st.session_state["audit_thread_select"] = thread_ids[min(len(thread_ids) - 1, cur + 1)]
 
             nav_prev, nav_select, nav_next = st.columns([1, 6, 1])
             with nav_prev:
                 st.markdown("<br>", unsafe_allow_html=True)
-                if st.button("⬅ Prev", use_container_width=True, key="nav_prev", disabled=(idx == 0)):
-                    st.session_state["audit_idx"] = idx - 1
-                    st.rerun()
+                st.button("⬅ Prev", use_container_width=True, key="nav_prev",
+                          disabled=(idx == 0), on_click=_go_prev)
             with nav_select:
                 selected_tid = st.selectbox(
                     "Select Thread to Audit:",
                     thread_ids,
-                    index=idx,
                     key="audit_thread_select"
                 )
-                # Sync selectbox back to session state
-                new_idx = thread_ids.index(selected_tid) if selected_tid in thread_ids else 0
-                if new_idx != st.session_state["audit_idx"]:
-                    st.session_state["audit_idx"] = new_idx
             with nav_next:
                 st.markdown("<br>", unsafe_allow_html=True)
-                if st.button("Next ➡", use_container_width=True, key="nav_next", disabled=(idx >= len(thread_ids) - 1)):
-                    st.session_state["audit_idx"] = idx + 1
-                    st.rerun()
+                st.button("Next ➡", use_container_width=True, key="nav_next",
+                          disabled=(idx >= len(thread_ids) - 1), on_click=_go_next)
             row = df_llm[df_llm["thread_id"] == selected_tid].iloc[0]
             tid_str = str(selected_tid)
             is_already_audited = tid_str in audited_ids
@@ -310,7 +314,7 @@ with tab2:
                     format_func=lambda x: "🤖 0 — Self-Service" if x == 0 else "🚨 1 — Escalation",
                     index=0 if default_esc == 0 else 1,
                     horizontal=True,
-                    key="human_esc_radio"
+                    key=f"human_esc_radio_{tid_str}"
                 )
 
                 if human_esc == 1:
@@ -326,14 +330,14 @@ with tab2:
                     "Category:",
                     cat_options,
                     index=default_cat_idx,
-                    key="human_cat_select"
+                    key=f"human_cat_select_{tid_str}"
                 )
 
                 human_notes = st.text_input(
                     "Notes (optional):",
                     value=default_notes,
                     placeholder="e.g. 'LLM missed the refund demand'",
-                    key="human_notes_input"
+                    key=f"human_notes_input_{tid_str}"
                 )
 
                 auditor_name = st.text_input(
