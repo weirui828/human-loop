@@ -23,117 +23,204 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# Custom CSS — Warm Light Theme
+# Custom CSS — Wei Design System, "microbrew" theme
+#
+# Ported from @wei/design-system's microbrew theme: an editorial mauve ground
+# sampled from typewolf.com/lookbooks, with the Outdoorsy Microbrew lookbook
+# olive carrying every interactive element.
+#
+# Structured the same way the design system is, in two layers: a fixed PALETTE,
+# then a SEMANTIC layer that every rule below consumes. Nothing here references
+# a raw hex directly, so reskinning this app later means editing the semantic
+# block and nothing else.
+#
+# Contrast note: the olive is #79875e in the source, but white on it is only
+# 3.86:1 — below AA. Fills use olive-600 and text olive-700, exactly as the
+# design system does.
 st.markdown("""
 <style>
-    /* Global warm cream background */
+    :root {
+        /* ── PALETTE ─────────────────────────────────────────────── */
+        --mauve-100: #e6ddde;   /* the source page ground */
+        --mauve-200: #d8cccd;
+        --mauve-300: #c3b3b5;
+        --mauve-600: #6d585b;
+        --mauve-700: #574548;
+        --mauve-800: #443235;   /* the source body text */
+
+        --olive-100: #e3e8da;
+        --olive-200: #c8d2b7;
+        --olive-500: #79875e;   /* Outdoorsy Microbrew cover */
+        --olive-600: #64714d;
+        --olive-700: #4f5a3d;
+
+        --blush-100: #f7ecec;
+        --blush-300: #dab7ba;   /* Classy Luxury cover */
+        --blush-700: #7d4f55;
+        --cobalt-100: #dbe3f4;
+        --cobalt-500: #19449c;  /* SaaS Tech cover */
+        --cobalt-700: #123274;
+        --peach-100: #fdeee7;   /* Retro Warmth cover, lightened */
+        --peach-800: #7d4620;
+        --pine-100: #dceadf;
+        --pine-700: #1a4b29;
+        --ember-100: #f8dedb;
+        --ember-500: #a8372e;
+        --ember-700: #7f2922;
+
+        /* ── SEMANTIC — what every rule below uses ───────────────── */
+        --surface-base: var(--mauve-100);
+        --surface-raised: #ffffff;
+        --surface-sunken: var(--mauve-200);
+        --fg-default: var(--mauve-800);
+        --fg-muted: var(--mauve-700);
+        --fg-subtle: var(--mauve-600);
+        --border-subtle: var(--mauve-200);
+        --border-default: var(--mauve-300);
+        --border-control: var(--mauve-600);
+        --accent-default: var(--olive-600);
+        --accent-hover: var(--olive-700);
+        --accent-fg: var(--olive-700);
+        --accent-subtle: var(--olive-100);
+
+        /* ── SHARED — radius, elevation, type ────────────────────── */
+        --radius-md: 0.375rem;
+        --radius-lg: 0.5rem;
+        --radius-xl: 0.75rem;
+        --shadow-sm: 0 1px 3px 0 rgb(68 50 53 / 0.09), 0 1px 2px -1px rgb(68 50 53 / 0.06);
+        --shadow-md: 0 4px 8px -2px rgb(68 50 53 / 0.1), 0 2px 4px -2px rgb(68 50 53 / 0.05);
+        --font-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto,
+                     "Helvetica Neue", Arial, sans-serif;
+    }
+
     .stApp {
-        background-color: #FDF5EE;
+        background-color: var(--surface-base);
+        color: var(--fg-default);
+        font-family: var(--font-sans);
     }
     .block-container {
         max-width: 1280px;
         padding-top: 1rem;
     }
-    header[data-testid="stHeader"] {
-        display: none;
-    }
+    header[data-testid="stHeader"] { display: none; }
 
-    /* Header gradient — macaron blue/green */
+    /* Numbers must align across rows — tabular figures everywhere numeric. */
+    .metric-value, .result-confidence, table { font-variant-numeric: tabular-nums; }
+
+    /* Header. The design system has no gradient text; a solid deep plum with
+       the olive doing the accenting is truer to it and far more legible. */
     .main-header {
-        font-size: 2.4rem;
-        font-weight: 700;
+        font-size: 2.25rem;
+        font-weight: 600;
         line-height: 1.2;
-        background: linear-gradient(135deg, #7EC8C8, #8BBFAA, #A8D8D0);
-        -webkit-background-clip: text;
-        -webkit-text-fill-color: transparent;
+        letter-spacing: -0.01em;
+        color: var(--fg-default);
         margin-bottom: 0.25rem;
     }
     .sub-header {
-        font-size: 1.05rem;
-        color: #8AADA8;
+        font-size: 0.875rem;
+        color: var(--fg-muted);
         margin-bottom: 1.5rem;
     }
 
-    /* Content card wrapper */
+    /* Surfaces stack: page → card → well, in three steps. */
     .content-card {
-        background-color: #FFFFFF;
-        border-radius: 18px;
-        padding: 2rem 2.25rem;
-        box-shadow: 0 2px 16px rgba(126, 200, 200, 0.10);
+        background-color: var(--surface-raised);
+        border: 1px solid var(--border-subtle);
+        border-radius: var(--radius-lg);
+        padding: 1.5rem;
+        box-shadow: var(--shadow-sm);
         margin-bottom: 1.5rem;
     }
 
-    /* Metric cards for audit tab */
     .metric-card {
-        background-color: #FFFFFF;
-        border: 1px solid rgba(126, 200, 200, 0.2);
-        border-radius: 12px;
-        padding: 1.25rem;
+        background-color: var(--surface-raised);
+        border: 1px solid var(--border-subtle);
+        border-radius: var(--radius-lg);
+        padding: 1rem;
         text-align: center;
-        box-shadow: 0 1px 6px rgba(126, 200, 200, 0.08);
     }
     .metric-value {
-        font-size: 2rem;
-        font-weight: 800;
-        color: #3A5A5A;
+        font-size: 1.75rem;
+        font-weight: 600;
+        color: var(--fg-default);
     }
     .metric-label {
-        font-size: 0.85rem;
-        color: #8AADA8;
+        font-size: 0.75rem;
+        font-weight: 500;
+        color: var(--fg-muted);
         text-transform: uppercase;
         letter-spacing: 0.05em;
     }
 
-    /* LLM verdict cards */
+    /* The two LLM verdicts are a categorical pair, so they take two distinct
+       lookbook hues rather than two shades of one. */
     .llm-card-gemini {
-        background-color: rgba(126, 200, 200, 0.08);
-        border: 1px solid rgba(126, 200, 200, 0.25);
-        border-radius: 10px;
+        background-color: var(--cobalt-100);
+        border: 1px solid var(--cobalt-500);
+        border-radius: var(--radius-md);
         padding: 1rem;
+        color: var(--cobalt-700);
     }
     .llm-card-anthropic {
-        background-color: rgba(168, 85, 247, 0.06);
-        border: 1px solid rgba(168, 85, 247, 0.2);
-        border-radius: 10px;
+        background-color: var(--blush-100);
+        border: 1px solid var(--blush-300);
+        border-radius: var(--radius-md);
         padding: 1rem;
+        color: var(--blush-700);
     }
 
-    /* Chat bubbles */
+    /* Customer vs agent — also categorical, also two distinct hues. */
     .chat-bubble-customer {
-        background-color: rgba(126, 200, 200, 0.08);
-        border-left: 4px solid #7EC8C8;
+        background-color: var(--accent-subtle);
+        border-left: 3px solid var(--olive-500);
         padding: 0.75rem 1rem;
-        border-radius: 8px;
+        border-radius: var(--radius-md);
         margin-bottom: 0.5rem;
+        color: var(--fg-default);
     }
     .chat-bubble-agent {
-        background-color: rgba(139, 191, 170, 0.08);
-        border-left: 4px solid #8BBFAA;
+        background-color: var(--surface-sunken);
+        border-left: 3px solid var(--border-control);
         padding: 0.75rem 1rem;
-        border-radius: 8px;
+        border-radius: var(--radius-md);
         margin-bottom: 0.5rem;
+        color: var(--fg-default);
     }
 
-    /* Gradient analyze button */
-    div.stButton > button[kind="primary"],
-    div.stButton > button {
-        background: linear-gradient(90deg, #7EC8C8, #8BBFAA) !important;
-        color: white !important;
+    /* Buttons. Flat olive, no gradient — the design system fills solid. */
+    div.stButton > button,
+    div.stButton > button[kind="primary"] {
+        background: var(--accent-default) !important;
+        color: #ffffff !important;
         border: none !important;
-        border-radius: 12px !important;
-        padding: 0.65rem 1.5rem !important;
-        font-weight: 600 !important;
-        font-size: 1rem !important;
-        transition: opacity 0.2s !important;
+        border-radius: var(--radius-md) !important;
+        padding: 0.5rem 1rem !important;
+        font-family: var(--font-sans) !important;
+        font-weight: 500 !important;
+        font-size: 0.875rem !important;
+        box-shadow: none !important;
+        transition: background-color 0.15s !important;
     }
     div.stButton > button:hover {
-        opacity: 0.88 !important;
+        background: var(--accent-hover) !important;
+        opacity: 1 !important;
+    }
+    /* One focus indicator for the whole app: an outline, so it follows the
+       radius and survives High Contrast Mode. */
+    div.stButton > button:focus-visible,
+    div[data-baseweb="select"] > div:focus-within,
+    .stTextArea textarea:focus {
+        outline: 2px solid var(--accent-default) !important;
+        outline-offset: 2px !important;
+        box-shadow: none !important;
     }
 
-    /* Result cards */
+    /* Result cards use the status semantics, not the accent. */
     .result-card-escalated {
-        background-color: rgba(230, 150, 150, 0.15);
-        border-radius: 14px;
+        background-color: var(--ember-100);
+        border: 1px solid var(--ember-500);
+        border-radius: var(--radius-lg);
         padding: 1rem 1.25rem;
         margin-top: 0.75rem;
         display: flex;
@@ -141,8 +228,9 @@ st.markdown("""
         gap: 0.75rem;
     }
     .result-card-safe {
-        background-color: rgba(126, 200, 200, 0.12);
-        border-radius: 14px;
+        background-color: var(--pine-100);
+        border: 1px solid var(--pine-700);
+        border-radius: var(--radius-lg);
         padding: 1rem 1.25rem;
         margin-top: 0.75rem;
         display: flex;
@@ -150,32 +238,53 @@ st.markdown("""
         gap: 0.75rem;
     }
     .result-icon {
-        font-size: 1.5rem;
+        font-size: 1.25rem;
         line-height: 1;
         flex-shrink: 0;
         margin-top: 0.15rem;
     }
     .result-title {
-        font-weight: 700;
-        font-size: 1.05rem;
-        color: #3A5A5A;
+        font-weight: 600;
+        font-size: 1rem;
+        color: var(--fg-default);
         margin-bottom: 0.15rem;
     }
     .result-confidence {
-        font-size: 0.9rem;
-        color: #8AADA8;
+        font-size: 0.8125rem;
+        color: var(--fg-muted);
     }
 
-    /* Dropdown / selectbox styling */
-    div[data-baseweb="select"] > div {
-        background-color: rgba(126, 200, 200, 0.10) !important;
-        border-color: rgba(126, 200, 200, 0.30) !important;
-        border-radius: 10px !important;
+    /* Form controls. border-control is the only border step that meets the
+       3:1 non-text contrast minimum, so interactive edges use it. */
+    div[data-baseweb="select"] > div,
+    .stTextArea textarea,
+    .stTextInput input {
+        background-color: var(--surface-raised) !important;
+        border: 1px solid var(--border-control) !important;
+        border-radius: var(--radius-md) !important;
+        color: var(--fg-default) !important;
+        font-family: var(--font-sans) !important;
     }
     div[data-baseweb="popover"] ul {
-        background-color: #F2FAF8 !important;
+        background-color: var(--surface-raised) !important;
+        border: 1px solid var(--border-default) !important;
+        border-radius: var(--radius-md) !important;
+    }
+    div[data-baseweb="popover"] li:hover { background-color: var(--accent-subtle) !important; }
+
+    /* Tabs — flat, with the olive marking the selected one. */
+    button[data-baseweb="tab"] {
+        font-family: var(--font-sans) !important;
+        font-weight: 500 !important;
+        color: var(--fg-muted) !important;
+    }
+    button[data-baseweb="tab"][aria-selected="true"] { color: var(--fg-default) !important; }
+    div[data-baseweb="tab-highlight"], div[data-baseweb="tab-border"] {
+        background-color: var(--accent-default) !important;
     }
 
+    h1, h2, h3, h4, h5 { color: var(--fg-default) !important; font-family: var(--font-sans) !important; }
+    code { background-color: var(--surface-sunken) !important; color: var(--fg-default) !important; }
 </style>
 """, unsafe_allow_html=True)
 
@@ -390,10 +499,11 @@ with tab2:
 
             with col_llm:
                 st.markdown("#### 🤖 LLM Verdict")
+                # Status semantics, not raw hexes — these follow the theme.
                 if llm_esc == 1:
-                    verdict_html = '<div class="metric-value" style="color: #E69696; font-size: 1.4rem;">🚨 Escalated (1)</div>'
+                    verdict_html = '<div class="metric-value" style="color: var(--ember-700); font-size: 1.4rem;">🚨 Escalated (1)</div>'
                 else:
-                    verdict_html = '<div class="metric-value" style="color: #7EC8C8; font-size: 1.4rem;">🤖 Self-Service (0)</div>'
+                    verdict_html = '<div class="metric-value" style="color: var(--pine-700); font-size: 1.4rem;">🤖 Self-Service (0)</div>'
                 st.markdown(
                     f'<div class="llm-card-gemini">'
                     f'{verdict_html}'
