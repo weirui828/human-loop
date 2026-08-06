@@ -183,7 +183,21 @@ Full analysis in **[03_bitext_distilbert.ipynb](notebooks/03_bitext_distilbert.i
 | **What the model buys**, zero-shot | **−0.0248** | Trained on Bitext, the transformer is *behind* the baseline |
 | **What is left** | 0.2006 | `0.9975` − `0.7969`. Neither more data nor a better model recovers it |
 
-### 3. Findings
+### 3. What it costs
+
+Both TWCS-trained models, same machine (Apple Silicon). Prediction is timed one query at a time, which is the worst case for the transformer — batching would close some of the gap.
+
+| | TF-IDF | DistilBERT | Ratio |
+| :--- | :---: | :---: | :---: |
+| **Training** | `0.09 s` | `222 s` (4 epochs, GPU) | ~2,600x |
+| **Predicting**, GPU | — | `6.38 ms` | 43x the CPU baseline |
+| **Predicting**, CPU | `0.15 ms` | `12.02 ms` | 82x |
+
+Neither number blocks anything at this scale — a retrain is a coffee break, and 6 ms disappears inside a support queue. The gap only starts to matter if you retrain constantly or serve at high volume, and it is the reason TF-IDF stays worth keeping as a fallback.
+
+It is worth noting that a frontier LLM answering the same question takes roughly a second or more per thread over the network, and bills per token every time. DistilBERT runs on the machine you already have, at milliseconds, for nothing per query. That is the whole argument for distilling a frontier model's judgment into a 67M-parameter one: you pay the frontier price once, during labeling, instead of on every ticket forever.
+
+### 4. Findings
 
 - **The Bitext benchmark tells you nothing.** DistilBERT beats the bigram model by `0.0005` there — a handful of rows out of 4,927. Templated text is easy for both, so testing only on it would rank them as equivalent.
 - **Trained on synthetic data and dropped onto tweets, the transformer is worse.** `0.5568` against `0.5816`. It does *order* the threads better (ROC-AUC `0.6271` vs `0.5811`), but it fits Bitext so completely that it becomes over-confident: nearly every tweet scores near zero, so at the usual `0.5` cut-off it flags almost nothing. Its best cut-off turns out to be `0.01`. Even given that best case, it still loses.
@@ -191,11 +205,13 @@ Full analysis in **[03_bitext_distilbert.ipynb](notebooks/03_bitext_distilbert.i
 - **The in-domain gain is precision, not recall.** DistilBERT raises far fewer false alarms but misses slightly more escalations. Macro F1 likes that trade; a support desk might not, which is why notebook 04 picks the cut-off deliberately.
 - **Bad labels cannot be fixed by a better model.** Both architectures failed on the same categories cross-domain, in nearly the same order, because both learned Bitext's rule that password resets are self-service. Trained on labels without that error, those categories recover.
 - **Casing changes nothing.** `distilbert-base-cased` — same size, same loop, 3 seeds — moves macro F1 by `−0.0042`, a fraction of the variation between seeds. Keeping case costs 6% more tokens and 23% more `[UNK]` on every tweet, to recover emphasis present in 12% of them.
-- **Latency is real but affordable.** `6.4 ms/query` on GPU, `12.0 ms` on CPU, single-instance, against the baseline's `0.15 ms` — about 43x slower, still well inside an interactive budget.
+- **The transformer's cost is real but affordable.** ~2,600x the training time and ~43x the inference time of the baseline, and both are still small in absolute terms.
 
-### 4. What we would deploy
+### 5. What we would deploy
 
-The **TWCS in-domain DistilBERT** at a cut-off of **`0.20`** rather than `0.5`. Keep TF-IDF as a fast fallback where latency matters: it reaches 92% of the transformer's score at 1/43rd the cost. Treat the Bitext-trained models as a cold-start bootstrap only — retire them once a few thousand real labels exist.
+The **TWCS in-domain DistilBERT** at a cut-off of **`0.20`** rather than `0.5`. Keep TF-IDF as a fallback for when the transformer is unavailable, not as a routing tier — the speed difference between them is real on paper and invisible in practice. Treat the Bitext-trained models as a cold-start bootstrap only: retire them once a few thousand real labels exist.
+
+**Hand off what it isn't sure about to paid frontier LLM.** DistilBERT is confident on most threads and genuinely torn on a small slice, and that slice is where most of its mistakes live. Sending just those few to a paid frontier LLM catches a good share of the errors while leaving the vast majority of traffic on the cheap local model. the small model handles the volume, the expensive one handles the doubt, and a human sees whatever still looks wrong afterwards.
 
 ---
 
