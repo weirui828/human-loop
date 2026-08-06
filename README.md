@@ -103,50 +103,45 @@ The Bitext-trained models are evaluated **cross-domain** on the full TWCS test s
 
 ---
 
-## 📊 Results & Findings (EDA & Baseline Model)
+## 📊 Results: TF-IDF Baselines
 
-Full interactive analysis, visual plots, and code execution can be viewed in our primary deliverable notebook:
-👉 **[01_bitext_baseline_modeling.ipynb](notebooks/01_bitext_baseline_modeling.ipynb)**
+Full analysis in **[01_bitext_baseline_modeling.ipynb](notebooks/01_bitext_baseline_modeling.ipynb)** and **[02_twcs_baseline_modeling.ipynb](notebooks/02_twcs_baseline_modeling.ipynb)**.
 
-### 1. Exploratory Data Analysis & Feature Engineering Insights
-- **Data Hygiene & Deduplication:** Audit of the raw 26,872 instruction pairs revealed zero null values across core fields. However, exactly **2,237 duplicate instructions** (`~8.32%`) were identified and removed to eliminate data leakage between train and test partitions (`cleaned shape: 24,635 x 24`).
-- **Target Class Imbalance:** Mapping the 27 intents to our binary `escalated` target yielded **17,770 Class 0 (Self-Service/Automated)** vs. **6,865 Class 1 (Escalated/Human Agent Needed)** records (`72.13% vs. 27.87%`). This realistic domain imbalance underscores why **F1-Score** and **ROC-AUC** must be prioritized over raw accuracy.
-- **Linguistic & Structural Variations:** Decomposing the multi-character `flags` field demonstrated strong variations across categories. For instance, colloquialisms (`flag_colloquial`), typos (`flag_typos_errors`), and negations (`flag_negation`) appear with significantly different density inside complex billing and complaint queries compared to standard order tracking requests.
+### 1. What the data looks like
+- **Cleaning.** The raw 26,872 Bitext pairs had no nulls, but **2,237 duplicate instructions** (`8.32%`) appeared in both train and test. Removing them leaves `24,635` rows.
+- **Class balance.** Mapping 27 intents to the binary target gives **17,770 self-service** vs **6,865 escalated** — `72% / 28%`. That imbalance is why we report macro F1 and ROC-AUC rather than accuracy.
+- **Linguistic tags.** Bitext ships per-row flags for colloquialisms, typos and negation. They cluster differently across categories — billing and complaint queries carry far more of them than order-tracking.
 
-### 2. Baseline Model Performance (`TF-IDF + Logistic Regression`)
-We evaluated a class-balanced Logistic Regression classifier trained on bigram TF-IDF representations (`max_features=10,000`, `ngram_range=(1,2)`) over a stratified 20% test split (`4,927` queries):
+### 2. The baseline on Bitext
 
-| Metric | Score | Rationale & Interpretation |
-| :--- | :--- | :--- |
-| **Macro F1-Score** | **0.9975** | Perfectly balances Precision (preventing agent overload) and Recall (catching critical complaints). |
-| **ROC-AUC** | **0.9999** | Demonstrates near-perfect discrimination across all decision thresholds on clean structured data. |
-| **Accuracy** | **0.9980** | Baseline ceiling on clean, templated in-domain data. |
-| **Precision (Macro)** | **0.9975** | Extremely low false-positive escalation rate. |
-| **Recall (Macro)** | **0.9975** | Exactly 5 false negatives out of 1,373 actual escalations. |
-| **Inference Latency** | **0.1293 ms/query** | High-speed benchmark (over 500 test runs) establishing the latency ceiling for real-time customer service deployment. |
+TF-IDF bigrams (`max_features=10,000`) + class-balanced Logistic Regression, on a stratified 20% test split (`4,927` queries):
 
-### Why Does the Linear Baseline Score So High?
-The Bitext dataset is synthetically generated with standardized entity placeholders (`{{Order Number}}`, `{{Customer Support Email}}`) and highly distinct lexical markers for each intent. A linear TF-IDF classifier easily separates these exact keyword patterns in-domain. 
+| Metric | Score |
+| :--- | :---: |
+| **Macro F1** | **0.9975** |
+| ROC-AUC | 0.9999 |
+| Accuracy | 0.9980 |
+| Precision (macro) | 0.9975 |
+| Recall (macro) | 0.9975 |
+| Latency | 0.1349 ms/query |
 
-**Next Steps (Cross-Domain Generalization):** When deployed against unstructured, non-templated, noisy real-world tweets (Twitter Customer Support dataset), n-gram models suffer severe performance degradation. The benchmark below quantifies that drop against the LLM-labeled sample.
+**Why so high?** Bitext is synthetic. Entities are placeholders (`{{Order Number}}`), and each intent has its own distinctive words, so a linear model separates them almost perfectly. This number measures the dataset, not the model.
 
-### 3. Cross-Domain Generalization Benchmark (`Bitext -> TWCS`)
+### 3. The same model on real tweets
 
-To quantify the vulnerability of surface-level lexical representations (`TF-IDF`), we evaluated our Bitext-trained baseline classifier directly against the **5,000-thread LLM-labeled TWCS sample**, alongside an In-Domain Twitter baseline retrained on an 80/20 split of the same labels (`models/twcs/tfidf/twcs_metrics.json`). Both use `first_customer_text` — the customer's opening message, exactly what the LLM labeler saw.
+Scored against the 5,000 LLM-labeled TWCS threads, alongside a second TF-IDF trained *on* TWCS (80/20 split). Both read `first_customer_text` — the customer's opening message.
 
-| Metric | Bitext (In-Domain Ceiling) | TWCS In-Domain (80/20 Split) | TWCS Cross-Domain (Bitext -> Twitter) | Generalization Drop (Clean vs. Cross) |
+| Metric | Bitext (in-domain) | TWCS (in-domain) | TWCS (cross-domain) | Drop |
 | :--- | :---: | :---: | :---: | :---: |
-| **Macro F1-Score** | **0.9975** | **0.7327** | **0.5816** | **-0.4159** |
-| ROC-AUC | 0.9999 | 0.8258 | 0.5811 | -0.4188 |
-| Accuracy | 0.9980 | 0.7640 | 0.6604 | -0.3376 |
-| Precision (Macro) | 0.9975 | 0.7264 | 0.5874 | -0.4090 |
-| Recall (Macro) | 0.9975 | 0.7432 | 0.5792 | -0.4172 |
+| **Macro F1** | **0.9975** | **0.7327** | **0.5816** | **−0.4159** |
+| ROC-AUC | 0.9999 | 0.8258 | 0.5811 | −0.4188 |
+| Accuracy | 0.9980 | 0.7640 | 0.6604 | −0.3376 |
 
-### Per-Category Cross-Domain Recall
+### Recall by category, cross-domain
 
-A single F1 hides the mechanism. Because each escalated thread carries its Bitext intent, we can see which intents survive the shift:
+The average hides which intents survive the move:
 
-| Escalation intent | Threads | Cross-domain recall |
+| Escalation intent | Threads | Recall |
 | :--- | :---: | :---: |
 | `check_cancellation_fee` | 18 | **0.72** |
 | `contact_human_agent` | 65 | 0.60 |
@@ -156,51 +151,78 @@ A single F1 hides the mechanism. Because each escalated thread carries its Bitex
 | `complaint` | 759 | 0.32 |
 | `registration_problems` | 125 | **0.20** |
 
-**Key Benchmarking Takeaways:**
-- **Lexical Overfitting & Domain Shift:** The linear n-gram model drops **41 percentage points** in Macro F1 moving from structured instructions (`Bitext`) to noisy social media threads (`TWCS`). Without semantic abstraction, TF-IDF cannot recognise that slang (`wtf`, `sux`, `pls help`) maps to the intents it trained on.
-- **Vocabulary mismatch explains ~15 points, not half the gap.** Retraining on target-domain vocabulary buys `+0.1511` F1 (`0.5816 -> 0.7327`). The remaining `0.2648` to the synthetic ceiling is an architectural limit, not a vocabulary one.
-- **The in-domain ceiling is `0.7327`.** That is what a linear n-gram model extracts from the customer's opening message alone — the only text available at triage time, before any reply exists.
-- **The worst failures are a taxonomy collision, not just noise.** `registration_problems` (0.20) and `payment_issue` (0.35) are *functional* intents with distinctive vocabulary and should have been easy. They fail because Bitext maps `recover_password` and `check_invoice` to **self-service (0)**, while in real Twitter traffic a lockout or a missing payment is exactly what needs a human. The model matches the words correctly and applies the wrong rule. The two categories a support desk can least afford to misroute — locked-out users and missing money — are the two this baseline is worst at catching.
+**What this shows:**
 
-We then fine-tuned **DistilBERT** (`distilbert-base-uncased`) to test whether semantic representations overcome this lexical brittleness. They do not — at least not transferred zero-shot. The results are below.
+- **The model memorised words, not meaning.** 41 points of macro F1 disappear moving from templated instructions to real tweets. It has no way to know that `wtf`, `sux` and `pls help` mean what its training examples meant.
+- **Real labels buy back 15 points, not half.** Retraining on TWCS lifts `0.5816 → 0.7327`. The remaining `0.2648` is not a vocabulary problem — more Twitter text will not close it for a linear model.
+- **`0.7327` is the ceiling for n-grams here.** That is what a bag of bigrams gets from the opening message alone, which is all a live system has when a tweet arrives.
+- **The worst failures come from bad labels, not noise.** `registration_problems` (0.20) and `payment_issue` (0.35) have perfectly clear vocabulary. They fail because Bitext files password resets and invoice lookups as *self-service*, while on Twitter a lockout or a double charge is exactly what needs a human. The model reads the words correctly and applies the wrong rule — and the two things a support desk can least afford to misroute are locked-out users and missing money.
 
 ---
 
-## 🤖 Results & Findings (DistilBERT SLM)
+## 🤖 Results: DistilBERT
 
-Full analysis in **[03_bitext_distilbert.ipynb](notebooks/03_bitext_distilbert.ipynb)** and **[04_twcs_distilbert.ipynb](notebooks/04_twcs_distilbert.ipynb)**. Both notebooks reuse the *exact* 80/20 splits of the baselines (`random_state=42`) and verify it by re-scoring the serialized TF-IDF pipelines on the reconstructed test sets before making any comparison.
+Full analysis in **[03_bitext_distilbert.ipynb](notebooks/03_bitext_distilbert.ipynb)**, **[04_twcs_distilbert.ipynb](notebooks/04_twcs_distilbert.ipynb)** and **[05_casing_comparison.ipynb](notebooks/05_casing_comparison.ipynb)**. All three reuse the baselines' exact 80/20 splits and verify it by re-scoring the saved TF-IDF pipelines before comparing anything.
 
 > All F1 figures in this project are **macro** — averaged over both classes.
 
-### 1. The Complete 2×2 Benchmark
+### 1. All four models
 
-| | **Bitext In-Domain** (synthetic ceiling) | **TWCS Cross-Domain** (zero-shot) | **TWCS In-Domain** (80/20 real labels) |
+| | **Bitext** (synthetic) | **Cross-domain** (zero-shot) | **TWCS** (real labels) |
 | :--- | :---: | :---: | :---: |
 | **TF-IDF + Logistic Regression** | 0.9975 | 0.5816 | 0.7327 |
-| **DistilBERT** | **0.998** | 0.5568 | **0.7969** |
+| **DistilBERT** | **0.9980** | 0.5568 | **0.7969** |
 
-### 2. Decomposing the Gap
+### 2. Where the gap goes
 
-| Component | Macro F1 | Reading |
+| | Macro F1 | |
 | :--- | :---: | :--- |
-| **Vocabulary gap** (TF-IDF) | **+0.1511** | What target-domain labels buy the linear family. |
-| **Vocabulary gap** (DistilBERT) | **+0.2401** | What they buy the transformer — the largest single term in the study. |
-| **Architecture gap**, in-domain | +0.0642 | What the transformer adds with training data held constant. |
-| **Architecture gap**, zero-shot | **−0.0248** | Transferred cold from synthetic data, the transformer is *behind* the baseline. |
-| **Irreducible remainder** | 0.2006 | `0.9975` ceiling − `0.7969` best real-data result. Recovered by neither data nor architecture. |
+| **What labels buy** (TF-IDF) | **+0.1511** | Retraining the linear model on real data |
+| **What labels buy** (DistilBERT) | **+0.2401** | Same, for the transformer — the biggest single gain in the study |
+| **What the model buys**, real data | +0.0642 | DistilBERT over TF-IDF, both trained on TWCS |
+| **What the model buys**, zero-shot | **−0.0248** | Trained on Bitext, the transformer is *behind* the baseline |
+| **What is left** | 0.2006 | `0.9975` − `0.7969`. Neither more data nor a better model recovers it |
 
-### 3. Key Findings
+### 3. Findings
 
-- **The synthetic in-domain benchmark is uninformative.** DistilBERT beats the bigram baseline by `0.0005` on Bitext — a handful of rows out of 4,927. Templated text with entity slots is linearly separable, so a benchmark run only there ranks the two architectures as equivalent and measures a property of the *corpus*, not the models.
-- **Zero-shot transfer is not deployable, and the transformer is not the fix.** DistilBERT posts the *higher* ROC-AUC (`0.6271` vs `0.5811`) but the *lower* macro F1 (`0.5568` vs `0.5816`). Fitting Bitext to a training loss near `0.001` left it emitting saturated probabilities that collapse toward the majority class off-distribution: its optimal cross-domain threshold is **`0.01`**, not `0.50`. Even granting each model its best threshold — an oracle upper bound — the gap only narrows to `0.003` and never reverses.
-- **Target-domain labels are worth ~3–4x more than architecture.** `+0.1511`/`+0.2401` from labels versus `+0.0642` from the architecture. **The implication is a labeling budget, not a model upgrade** — and the transformer pays off *after* the labels exist, not instead of them.
-- **The in-domain gain is precision, not recall.** DistilBERT trades recall for precision rather than dominating on both. Macro F1 rewards that trade; a support desk might not. Notebook 04 therefore sets the operating point explicitly, and the macro-F1 curve is nearly flat across `0.20–0.55` — so where the errors land is very nearly a free choice.
-- **The taxonomy collision is a labeling-design lesson, not a modelling one.** Both architectures failed hardest on the same categories cross-domain, and in nearly the same rank order, because both inherited the Bitext mapping of `recover_password` and `check_invoice` to self-service. Trained on TWCS labels that never carried that error, `registration_problems` and `payment_issue` recover sharply. **No encoder can out-model a definition mistake.**
-- **Casing buys nothing.** Swapping in `distilbert-base-cased` — same size, same loop, 3 seeds — moves macro F1 by `−0.0042`, a sixth of the seed-to-seed spread. A smaller vocabulary stretched over two cases fragments harder, spending 6% more tokens and 23% more `[UNK]` on every row to recover an emphasis signal present in 12% of them. The uncased default stands, now tested rather than assumed.
-- **Latency is a real but affordable cost.** `~5–7 ms/query` on Apple Silicon GPU and `~9–10 ms` on CPU, single-instance, against the baseline's `0.127 ms` — roughly 45x slower, and still far inside any interactive budget.
+- **The Bitext benchmark tells you nothing.** DistilBERT beats the bigram model by `0.0005` there — a handful of rows out of 4,927. Templated text is easy for both, so testing only on it would rank them as equivalent.
+- **Trained on synthetic data and dropped onto tweets, the transformer is worse.** `0.5568` against `0.5816`. It does *order* the threads better (ROC-AUC `0.6271` vs `0.5811`), but it fits Bitext so completely that it becomes over-confident: nearly every tweet scores near zero, so at the usual `0.5` cut-off it flags almost nothing. Its best cut-off turns out to be `0.01`. Even given that best case, it still loses.
+- **Real labels are worth ~4x a better model.** `+0.1511`/`+0.2401` from labels versus `+0.0642` from the architecture. **Spend the budget on labeling** — the transformer pays off afterwards, on the data you then have.
+- **The in-domain gain is precision, not recall.** DistilBERT raises far fewer false alarms but misses slightly more escalations. Macro F1 likes that trade; a support desk might not, which is why notebook 04 picks the cut-off deliberately.
+- **Bad labels cannot be fixed by a better model.** Both architectures failed on the same categories cross-domain, in nearly the same order, because both learned Bitext's rule that password resets are self-service. Trained on labels without that error, those categories recover.
+- **Casing changes nothing.** `distilbert-base-cased` — same size, same loop, 3 seeds — moves macro F1 by `−0.0042`, a fraction of the variation between seeds. Keeping case costs 6% more tokens and 23% more `[UNK]` on every tweet, to recover emphasis present in 12% of them.
+- **Latency is real but affordable.** `6.4 ms/query` on GPU, `12.0 ms` on CPU, single-instance, against the baseline's `0.15 ms` — about 43x slower, still well inside an interactive budget.
 
-### 4. Deployment Recommendation
-Route on the **TWCS in-domain DistilBERT** at a threshold of `0.20–0.30`. Keep TF-IDF as a fallback tier where microsecond latency matters — it retains 93% of the transformer's in-domain macro F1 at ~1/45th the cost. Treat the Bitext-trained models as a cold-start bootstrap for a queue with no labels yet, to be retired once a few thousand real ones exist.
+### 4. What we would deploy
+
+The **TWCS in-domain DistilBERT** at a cut-off of **`0.20`** rather than `0.5`. Keep TF-IDF as a fast fallback where latency matters: it reaches 92% of the transformer's score at 1/43rd the cost. Treat the Bitext-trained models as a cold-start bootstrap only — retire them once a few thousand real labels exist.
+
+---
+
+## 🔭 Future Improvements
+
+- **A tweet-native encoder.** `distilbert-base-uncased` was pretrained on Wikipedia and books, and its
+  tokenizer shows it: every emoji becomes `[UNK]`, and an `@handle` costs 6–8 subword fragments.
+  [BERTweet](https://huggingface.co/vinai/bertweet-base) was pretrained on 850M tweets, carries emoji
+  in its vocabulary, and normalizes handles and URLs to single tokens. The catch is size — at 135M
+  parameters it is twice DistilBERT and no longer a *small* language model, so it belongs as a
+  reference ceiling rather than a replacement. The version that keeps the premise intact is
+  continued pretraining: more masked-language-model training on the 2.8M unlabeled tweets already in
+  `twcs.csv`, keeping 67M parameters.
+
+- **Validate the labels against humans.** Every number here measures agreement with `claude-opus-5`.
+  Hand-labeling 200–300 threads from the same sample and reporting **Cohen's κ** against the LLM
+  labels would turn "agrees with Opus" into a calibrated estimate of "agrees with a human". The
+  audit tab in [`app.py`](app.py) exists to produce exactly that subsample.
+
+- **Find out whether more labels help.** Labels were the largest lever in the study by a wide margin.
+  A learning curve — retraining at 1k, 2k and 3.6k rows — would show whether the curve is still
+  climbing or has flattened, and so whether another labeling round is worth funding.
+
+- **Fix the starved categories.** `contact_human_agent` has only 65 threads in the whole sample and is
+  the model's weakest category. Explicit requests for a human are also the least forgivable thing to
+  miss, and they are unambiguous enough that a keyword rule ahead of the model would likely serve
+  better than waiting for more training examples.
 
 ---
 
