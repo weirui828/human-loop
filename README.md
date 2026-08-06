@@ -221,15 +221,15 @@ human-loop/
 │   └── twcs/
 │       ├── tfidf/              # tfidf_twcs.pkl, twcs_metrics.json
 │       └── distilbert/         # weights (gitignored) + twcs_distilbert_metrics.json,
-│                               #   casing_ablation.json
+│                               #   casing_comparison.json
 ├── src/
 │   └── distilbert_utils.py     # Fine-tuning loop used by notebooks 03-05
 ├── notebooks/                  # Jupyter notebooks for EDA and experimentation
 │   ├── 01_bitext_baseline_modeling.ipynb # Primary EDA & baseline modeling notebook
-│   ├── 02_twcs_baseline_modeling.ipynb # TWCS thread reconstruction & cross-domain evaluation
+│   ├── 02_twcs_baseline_modeling.ipynb # TWCS cross-domain evaluation & in-domain TF-IDF baseline
 │   ├── 03_bitext_distilbert.ipynb # DistilBERT on Bitext + cross-domain transfer
 │   ├── 04_twcs_distilbert.ipynb # DistilBERT in-domain on TWCS + final 2x2 benchmark
-│   └── 05_casing_ablation.ipynb # Encoder casing ablation (uncased vs cased)
+│   └── 05_casing_comparison.ipynb # Casing comparison (uncased vs cased)
 ├── docs/                       # Screenshots and documentation assets
 │   └── ui.png
 ├── app.py                      # Interactive Streamlit demo & label review UI
@@ -246,10 +246,10 @@ The full analysis, visualizations, and results are already captured in the five 
 | Notebook | What's Inside |
 | :--- | :--- |
 | **[01_bitext_baseline_modeling.ipynb](notebooks/01_bitext_baseline_modeling.ipynb)** | EDA, data cleaning, feature engineering, and the in-domain TF-IDF + Logistic Regression baseline on the Bitext dataset (`F1 = 0.9964`). |
-| **[02_twcs_baseline_modeling.ipynb](notebooks/02_twcs_baseline_modeling.ipynb)** | TWCS thread reconstruction, the confound check, and the cross-domain vs. in-domain benchmark on the LLM-labeled sample (`0.5816` cross-domain vs. `0.7327` in-domain F1), plus per-category recall. |
+| **[02_twcs_baseline_modeling.ipynb](notebooks/02_twcs_baseline_modeling.ipynb)** | The cross-domain vs. in-domain benchmark on the LLM-labeled sample (`0.5816` cross-domain vs. `0.7327` in-domain F1), plus per-category recall. |
 | **[03_bitext_distilbert.ipynb](notebooks/03_bitext_distilbert.ipynb)** | DistilBERT fine-tuned on Bitext (`0.9982` in-domain), its zero-shot transfer to TWCS (`0.5670`), the calibration analysis showing why a better-ranking model makes worse decisions, and per-category transfer against the baseline. |
 | **[04_twcs_distilbert.ipynb](notebooks/04_twcs_distilbert.ipynb)** | Learning-rate sweep and in-domain DistilBERT on TWCS (`0.7965`, 3-seed mean), the operating-threshold cost analysis, per-category recovery, and the final four-model 2×2 with the gap decomposition. |
-| **[05_casing_ablation.ipynb](notebooks/05_casing_ablation.ipynb)** | Encoder ablation testing whether `distilbert-base-cased` recovers the ALL-CAPS signal lowercasing discards. It does not (`−0.0042`, inside the noise floor), and the tokenizer statistics explain why. |
+| **[05_casing_comparison.ipynb](notebooks/05_casing_comparison.ipynb)** | A controlled comparison testing whether `distilbert-base-cased` recovers the ALL-CAPS signal lowercasing discards. It does not (`−0.0042`, inside the noise floor), and the tokenizer statistics explain why. |
 
 *Optional — to run the notebooks locally, install the dependencies first:*
 ```bash

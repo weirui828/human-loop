@@ -1,7 +1,7 @@
 {
   "description": "Cross-domain evaluation of the Bitext-trained DistilBERT on the 5,000-thread LLM-labeled TWCS sample (Notebook 03).",
   "source": "models/bitext/distilbert/bitext_distilbert_metrics.json",
-  "note": "TWCS labels are claude-opus-5 output under the contract in src/twcs/prompts.py, not human ground truth.",
+  "note": "TWCS labels are claude-opus-5 output under the triage contract, not human ground truth.",
   "model": "DistilBERT (distilbert-base-uncased), fine-tuned on Bitext",
   "bitext_in_domain": {
     "accuracy": 0.9986,

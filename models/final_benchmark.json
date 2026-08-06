@@ -1,6 +1,6 @@
 {
   "description": "Four-model benchmark across the Bitext/TWCS x TF-IDF/DistilBERT design.",
-  "note": "TWCS labels are claude-opus-5 output under the contract in src/twcs/prompts.py, not human ground truth. Cross-domain numbers measure agreement with LLM triage decisions.",
+  "note": "TWCS labels are claude-opus-5 output under the triage contract, not human ground truth. Cross-domain numbers measure agreement with LLM triage decisions.",
   "macro_f1": {
     "tfidf": {
       "bitext_in_domain": 0.9975,

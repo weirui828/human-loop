@@ -1,20 +1,6 @@
-# Streamlit's own theme, matched to the Wei Design System "microbrew" theme.
-#
-# This exists alongside the CSS block in app.py because the two reach different
-# things: CSS can restyle anything with a stable selector, but Streamlit paints
-# a number of widget internals (checkbox fills, slider tracks, its own focus
-# rings, the sidebar) from these values. Set only here, the app would be half
-# themed; set only in CSS, those internals would stay Streamlit red.
-#
-# Values are the microbrew semantic tokens:
-#   primaryColor            accent-default   olive-600, the interactive colour
-#   backgroundColor         surface-base     the mauve ground
-#   secondaryBackgroundColor surface-raised  cards and widget grounds
-#   textColor               fg-default       deep plum
-#
-# The accent is olive-600 rather than the #79875e cover colour on purpose:
-# white on the cover value is 3.86:1, below the 4.5:1 AA minimum for a button
-# label. See .design-sync/NOTES.md in the design system repo.
+# Streamlit paints some widget internals (checkbox fills, slider tracks, focus
+# rings, sidebar) from these values, which CSS in app.py cannot reach. Both are
+# needed for a consistent theme.
 
 [theme]
 base = "light"

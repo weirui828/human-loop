@@ -227,7 +227,7 @@ __marimo__/
 # Streamlit
 .streamlit/secrets.toml
 
-# Large data artifacts (raw + generated; reproducible via src/ scripts)
+# Large data artifacts (raw + generated; reproducible via notebooks)
 data/twcs/twcs.csv
 data/twcs/reconstructed_threads_20k.csv
 data/twcs/reconstructed_threads_20k.json
@@ -254,7 +254,7 @@ models/bitext/distilbert/*
 models/twcs/distilbert/*
 !models/bitext/distilbert/*_metrics.json
 !models/twcs/distilbert/*_metrics.json
-!models/twcs/distilbert/casing_ablation.json
+!models/twcs/distilbert/casing_comparison.json
 
 # src/ scripts — logic lives in the notebooks; standalone scripts are redundant.
 # Written as `src/*` rather than `src/` so a single file can be re-included below:

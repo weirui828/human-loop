@@ -13,11 +13,10 @@ Run:
 import os
 import csv
 import time
-import pickle
+import joblib
 import pandas as pd
 import streamlit as st
 
-# Configure Page Layout & Styling
 st.set_page_config(
     page_title="Human-in-the-Loop: Escalation Classifier & Dual-LLM Audit",
     page_icon="🤖",
@@ -282,33 +281,25 @@ AUDIT_CSV = os.path.join(BASE_DIR, "data", "twcs", "human_audit_5k.csv")
 TFIDF_PATH = os.path.join(BASE_DIR, "models", "twcs", "tfidf", "tfidf_twcs.pkl")
 DISTILBERT_DIR = os.path.join(BASE_DIR, "models", "twcs", "distilbert")
 
-# Both models are trained in-domain on the same 80/20 split of llm_labeled_5k.csv, so
-# their predictions are directly comparable. Reported test macro F1: TF-IDF 0.7327,
-# DistilBERT 0.7862 (models/twcs/tfidf/twcs_metrics.json and
-# models/twcs/distilbert/twcs_distilbert_metrics.json).
+# Both trained in-domain on the same 80/20 split, so predictions are comparable.
 MODEL_CHOICES = {
     "TF-IDF + Logistic Regression": "tfidf",
     "DistilBERT (fine-tuned)": "distilbert",
 }
-
 
 @st.cache_resource
 def load_tfidf():
     """Load the trained TF-IDF + Logistic Regression pipeline."""
     if not os.path.exists(TFIDF_PATH):
         return None
-    with open(TFIDF_PATH, "rb") as f:
-        return pickle.load(f)
-
+    return joblib.load(TFIDF_PATH)
 
 @st.cache_resource
 def load_distilbert():
-    """Load the fine-tuned DistilBERT classifier, or None if the weights are absent.
+    """Fine-tuned DistilBERT, or None if the weights are absent.
 
-    torch/transformers are imported lazily so that selecting TF-IDF never pays the
-    (multi-second) import cost, and so the app still starts on an install without them.
-    Inference runs on CPU: a single query is ~8 ms there, well inside an interactive
-    budget, and it avoids depending on an accelerator being present.
+    torch/transformers are imported lazily so selecting TF-IDF never pays the import
+    cost. Runs on CPU (~8 ms/query) to avoid requiring an accelerator.
     """
     if not os.path.exists(os.path.join(DISTILBERT_DIR, "model.safetensors")):
         return None
@@ -321,7 +312,6 @@ def load_distilbert():
     model = AutoModelForSequenceClassification.from_pretrained(DISTILBERT_DIR)
     model.eval()
     return {"model": model, "tokenizer": tokenizer, "torch": torch}
-
 
 def predict_escalation(kind, text):
     """Returns (is_escalated, p_escalated) for the selected model, or None if unavailable."""
@@ -357,9 +347,6 @@ st.markdown('<div class="sub-header">Cross-domain customer support evaluation & 
 
 tab1, tab2 = st.tabs(["🤖 Live Triage Simulator", "👥 Human Label Audit"])
 
-# ==============================================================================
-# TAB 1: LIVE TRIAGE SIMULATOR
-# ==============================================================================
 with tab1:
     st.subheader("Interactive Query Classifier")
     st.markdown("Enter a customer support query or thread to evaluate whether it requires human escalation or can be handled by self-service automation.")
@@ -370,7 +357,7 @@ with tab1:
         horizontal=True,
         help=(
             "Both are trained in-domain on the same 80/20 split of the labeled TWCS "
-            "sample. Test macro F1: TF-IDF 0.7327, DistilBERT 0.7862."
+            "sample. Test macro F1: TF-IDF 0.7327, DistilBERT 0.7965."
         ),
     )
     model_kind = MODEL_CHOICES[model_label]
@@ -441,9 +428,6 @@ with tab1:
                 "(first DistilBERT call includes model load)"
             )
 
-# ==============================================================================
-# TAB 2: HUMAN LABEL AUDIT
-# ==============================================================================
 with tab2:
     st.subheader("Human Label Audit")
     st.markdown("Review LLM-generated labels from `llm_labeled_5k.csv`. Confirm or correct each label. Corrections are saved to `human_audit_5k.csv` — the original file is never modified.")
@@ -451,10 +435,8 @@ with tab2:
     if not os.path.exists(LLM_LABELS_CSV):
         st.warning(f"LLM labels file not found at `{LLM_LABELS_CSV}`. Please generate labels first.")
     else:
-        # Load LLM labels (read-only source)
         df_llm = pd.read_csv(LLM_LABELS_CSV)
 
-        # Load existing audit progress
         audited_ids: set = set()
         audit_rows: dict = {}
         if os.path.exists(AUDIT_CSV):
@@ -469,7 +451,6 @@ with tab2:
         audited_count = len(audited_ids & set(df_llm["thread_id"].astype(str)))
         pending_count = total_threads - audited_count
 
-        # --- Progress Metrics ---
         m1, m2, m3 = st.columns(3)
         with m1:
             st.metric("Total Threads", f"{total_threads:,d}")
@@ -483,7 +464,6 @@ with tab2:
 
         st.divider()
 
-        # --- Filter ---
         view_filter = st.radio(
             "Show:",
             ["Pending only", "Audited only", "All"],
@@ -506,9 +486,8 @@ with tab2:
         else:
             thread_ids = df_view["thread_id"].tolist()
 
-            # The selectbox's own key is the single source of truth for the
-            # current thread. Reset it if it points outside the current view
-            # (e.g. the filter changed and dropped the previously-selected id).
+            # The selectbox key is the source of truth for the current thread;
+            # reset it when the filter drops the selected id.
             if (
                 "audit_thread_select" not in st.session_state
                 or st.session_state["audit_thread_select"] not in thread_ids
@@ -516,9 +495,8 @@ with tab2:
                 st.session_state["audit_thread_select"] = thread_ids[0]
             idx = thread_ids.index(st.session_state["audit_thread_select"])
 
-            # Prev/Next mutate the selectbox key directly. on_click callbacks run
-            # before the rerun, so the selectbox picks up the new value instead of
-            # its stale stored one (a plain `index=` arg would be ignored here).
+            # Prev/Next mutate the selectbox key directly: on_click runs before the
+            # rerun, so a plain `index=` arg would be ignored.
             def _go_prev():
                 cur = thread_ids.index(st.session_state["audit_thread_select"])
                 st.session_state["audit_thread_select"] = thread_ids[max(0, cur - 1)]
@@ -549,7 +527,6 @@ with tab2:
             if is_already_audited:
                 st.info("✅ This thread has already been audited. You can update your correction below.")
 
-            # --- Customer Message Display ---
             st.markdown("#### 👤 Customer's Opening Message")
             customer_text = str(row.get("first_customer_text", ""))
             st.markdown(
@@ -559,7 +536,6 @@ with tab2:
 
             st.divider()
 
-            # --- Side-by-side: LLM Verdict (left) | Human Audit (right) ---
             col_llm, col_human = st.columns(2)
 
             llm_esc = int(row.get("escalated", 0))
@@ -568,7 +544,6 @@ with tab2:
 
             with col_llm:
                 st.markdown("#### 🤖 LLM Verdict")
-                # Status semantics, not raw hexes — these follow the theme.
                 if llm_esc == 1:
                     verdict_html = '<div class="metric-value" style="color: var(--ember-700); font-size: 1.4rem;">🚨 Escalated (1)</div>'
                 else:
@@ -588,7 +563,6 @@ with tab2:
             with col_human:
                 st.markdown("#### ✍️ Human Audit")
 
-                # Pre-fill from existing audit if available
                 if is_already_audited:
                     prev = audit_rows[tid_str]
                     default_esc = int(prev.get("human_escalated", llm_esc))
@@ -657,13 +631,11 @@ with tab2:
                         "audit_timestamp": datetime.now(timezone.utc).isoformat()
                     }
 
-                    # Load existing audit file, update or append, then save
                     if os.path.exists(AUDIT_CSV):
                         df_existing = pd.read_csv(AUDIT_CSV)
                     else:
                         df_existing = pd.DataFrame(columns=AUDIT_FIELDNAMES)
 
-                    # If already audited, update the existing row; otherwise append
                     if tid_str in set(df_existing["thread_id"].astype(str)):
                         idx = df_existing[df_existing["thread_id"].astype(str) == tid_str].index[0]
                         for k, v in audit_record.items():
@@ -685,7 +657,6 @@ with tab2:
                     from datetime import datetime, timezone
                     st.session_state["auditor_name"] = auditor_name
 
-                    # Auto-confirm the LLM label as-is
                     audit_record = {
                         "thread_id": selected_tid,
                         "llm_escalated": llm_esc,
