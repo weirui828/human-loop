@@ -13,6 +13,13 @@ jupyter>=1.0.0
 ipykernel>=6.25.0
 nbconvert>=7.0.0
 joblib>=1.3.0
+
+# DistilBERT fine-tuning (notebooks 03 and 04, src/distilbert_utils.py).
+# Training is a plain PyTorch loop, so `datasets` and `accelerate` are deliberately
+# not required -- nothing in this project imports them.
+# Verified on torch 2.13.0 + transformers 5.14.1 (Apple Silicon MPS, Python 3.14).
+torch>=2.9.0
+transformers>=5.0.0
 requests>=2.31.0
 python-dotenv>=1.0.0
 streamlit>=1.30.0

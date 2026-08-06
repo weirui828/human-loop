@@ -1,0 +1,143 @@
+{
+  "model_name": "DistilBERT (distilbert-base-uncased), fine-tuned on Bitext",
+  "train_samples": 17737,
+  "val_samples": 1971,
+  "test_samples": 4927,
+  "train_duration_sec": 340.7,
+  "best_epoch": 2,
+  "best_val_macro_f1": 0.9994,
+  "hyperparameters": {
+    "checkpoint": "distilbert-base-uncased",
+    "epochs": 3,
+    "batch_size": 32,
+    "learning_rate": 2e-05,
+    "max_length": 64,
+    "warmup_ratio": 0.1,
+    "weight_decay": 0.01,
+    "class_weighted_loss": true,
+    "seed": 42
+  },
+  "training_history": [
+    {
+      "epoch": 1,
+      "train_loss": 0.125,
+      "val_macro_f1": 0.9987,
+      "epoch_sec": 114.4
+    },
+    {
+      "epoch": 2,
+      "train_loss": 0.0066,
+      "val_macro_f1": 0.9994,
+      "epoch_sec": 113.0
+    },
+    {
+      "epoch": 3,
+      "train_loss": 0.001,
+      "val_macro_f1": 0.9994,
+      "epoch_sec": 113.0
+    }
+  ],
+  "in_domain_bitext": {
+    "accuracy": 0.9986,
+    "precision_macro": 0.9981,
+    "recall_macro": 0.9983,
+    "f1_macro": 0.9982,
+    "precision_escalated": 0.9971,
+    "recall_escalated": 0.9978,
+    "f1_escalated": 0.9975,
+    "roc_auc": 1.0,
+    "confusion_matrix": {
+      "tn": 3550,
+      "fp": 4,
+      "fn": 3,
+      "tp": 1370
+    }
+  },
+  "cross_domain_twcs": {
+    "accuracy": 0.6962,
+    "precision_macro": 0.6179,
+    "recall_macro": 0.5701,
+    "f1_macro": 0.567,
+    "precision_escalated": 0.5068,
+    "recall_escalated": 0.2453,
+    "f1_escalated": 0.3305,
+    "roc_auc": 0.6271,
+    "confusion_matrix": {
+      "tn": 3106,
+      "fp": 365,
+      "fn": 1154,
+      "tp": 375
+    }
+  },
+  "cross_domain_twcs_tfidf_reference": {
+    "accuracy": 0.6604,
+    "precision_macro": 0.5874,
+    "recall_macro": 0.5792,
+    "f1_macro": 0.5816,
+    "precision_escalated": 0.435,
+    "recall_escalated": 0.3702,
+    "f1_escalated": 0.4,
+    "roc_auc": 0.5811,
+    "confusion_matrix": {
+      "tn": 2736,
+      "fp": 735,
+      "fn": 963,
+      "tp": 566
+    }
+  },
+  "cross_domain_threshold_calibration": {
+    "note": "Oracle upper bound: threshold selected on the evaluation set itself. Quantifies the calibration component of the gap, not a deployable score.",
+    "tfidf": {
+      "best_threshold": 0.48,
+      "best_macro_f1": 0.5849
+    },
+    "distilbert": {
+      "best_threshold": 0.015,
+      "best_macro_f1": 0.582
+    }
+  },
+  "per_category_cross_domain_recall": {
+    "check_cancellation_fee": {
+      "threads": 18,
+      "tfidf_recall": 0.722,
+      "distilbert_recall": 0.611
+    },
+    "contact_human_agent": {
+      "threads": 65,
+      "tfidf_recall": 0.6,
+      "distilbert_recall": 0.477
+    },
+    "contact_customer_service": {
+      "threads": 169,
+      "tfidf_recall": 0.515,
+      "distilbert_recall": 0.278
+    },
+    "get_refund": {
+      "threads": 112,
+      "tfidf_recall": 0.518,
+      "distilbert_recall": 0.268
+    },
+    "complaint": {
+      "threads": 759,
+      "tfidf_recall": 0.323,
+      "distilbert_recall": 0.245
+    },
+    "payment_issue": {
+      "threads": 281,
+      "tfidf_recall": 0.352,
+      "distilbert_recall": 0.21
+    },
+    "registration_problems": {
+      "threads": 125,
+      "tfidf_recall": 0.2,
+      "distilbert_recall": 0.088
+    }
+  },
+  "latency_benchmark": {
+    "avg_inference_ms_per_query_mps": 5.0707,
+    "avg_inference_ms_per_query_cpu": 8.2222,
+    "tfidf_reference_ms_per_query": 0.1293,
+    "test_iterations": 500,
+    "batch_size": 1
+  }
+}

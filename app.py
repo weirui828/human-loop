@@ -2,7 +2,8 @@
 app.py — Human-in-the-Loop Streamlit Dashboard
 
 Tabs:
-  1. Live Triage Simulator: Enter a customer message and see the escalation prediction.
+  1. Live Triage Simulator: Enter a customer message and see the escalation prediction,
+     from either the TF-IDF baseline or the fine-tuned DistilBERT (selectable).
   2. Human Label Audit: Review LLM-generated labels from llm_labeled_5k.csv,
      confirm or correct them, and save corrections to human_audit_5k.csv.
 
@@ -11,6 +12,7 @@ Run:
 """
 import os
 import csv
+import time
 import pickle
 import pandas as pd
 import streamlit as st
@@ -23,20 +25,6 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# Custom CSS — Wei Design System, "microbrew" theme
-#
-# Ported from @wei/design-system's microbrew theme: an editorial mauve ground
-# sampled from typewolf.com/lookbooks, with the Outdoorsy Microbrew lookbook
-# olive carrying every interactive element.
-#
-# Structured the same way the design system is, in two layers: a fixed PALETTE,
-# then a SEMANTIC layer that every rule below consumes. Nothing here references
-# a raw hex directly, so reskinning this app later means editing the semantic
-# block and nothing else.
-#
-# Contrast note: the olive is #79875e in the source, but white on it is only
-# 3.86:1 — below AA. Fills use olive-600 and text olive-700, exactly as the
-# design system does.
 st.markdown("""
 <style>
     :root {
@@ -291,17 +279,67 @@ st.markdown("""
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 LLM_LABELS_CSV = os.path.join(BASE_DIR, "data", "twcs", "llm_labeled_5k.csv")
 AUDIT_CSV = os.path.join(BASE_DIR, "data", "twcs", "human_audit_5k.csv")
-MODEL_PATH = os.path.join(BASE_DIR, "models", "twcs", "tfidf_twcs.pkl")
+TFIDF_PATH = os.path.join(BASE_DIR, "models", "twcs", "tfidf", "tfidf_twcs.pkl")
+DISTILBERT_DIR = os.path.join(BASE_DIR, "models", "twcs", "distilbert")
+
+# Both models are trained in-domain on the same 80/20 split of llm_labeled_5k.csv, so
+# their predictions are directly comparable. Reported test macro F1: TF-IDF 0.7327,
+# DistilBERT 0.7862 (models/twcs/tfidf/twcs_metrics.json and
+# models/twcs/distilbert/twcs_distilbert_metrics.json).
+MODEL_CHOICES = {
+    "TF-IDF + Logistic Regression": "tfidf",
+    "DistilBERT (fine-tuned)": "distilbert",
+}
+
 
 @st.cache_resource
-def load_model():
+def load_tfidf():
     """Load the trained TF-IDF + Logistic Regression pipeline."""
-    if not os.path.exists(MODEL_PATH):
+    if not os.path.exists(TFIDF_PATH):
         return None
-    with open(MODEL_PATH, "rb") as f:
+    with open(TFIDF_PATH, "rb") as f:
         return pickle.load(f)
 
-triage_model = load_model()
+
+@st.cache_resource
+def load_distilbert():
+    """Load the fine-tuned DistilBERT classifier, or None if the weights are absent.
+
+    torch/transformers are imported lazily so that selecting TF-IDF never pays the
+    (multi-second) import cost, and so the app still starts on an install without them.
+    Inference runs on CPU: a single query is ~8 ms there, well inside an interactive
+    budget, and it avoids depending on an accelerator being present.
+    """
+    if not os.path.exists(os.path.join(DISTILBERT_DIR, "model.safetensors")):
+        return None
+    try:
+        import torch
+        from transformers import AutoModelForSequenceClassification, AutoTokenizer
+    except ImportError:
+        return None
+    tokenizer = AutoTokenizer.from_pretrained(DISTILBERT_DIR)
+    model = AutoModelForSequenceClassification.from_pretrained(DISTILBERT_DIR)
+    model.eval()
+    return {"model": model, "tokenizer": tokenizer, "torch": torch}
+
+
+def predict_escalation(kind, text):
+    """Returns (is_escalated, p_escalated) for the selected model, or None if unavailable."""
+    if kind == "tfidf":
+        pipeline = load_tfidf()
+        if pipeline is None:
+            return None
+        p_escalated = float(pipeline.predict_proba([text])[0][1])
+    else:
+        bundle = load_distilbert()
+        if bundle is None:
+            return None
+        torch = bundle["torch"]
+        enc = bundle["tokenizer"](text, truncation=True, max_length=128, return_tensors="pt")
+        with torch.no_grad():
+            logits = bundle["model"](**enc).logits
+        p_escalated = float(torch.softmax(logits.float(), dim=-1)[0, 1])
+    return p_escalated >= 0.5, p_escalated
 
 AUDIT_FIELDNAMES = [
     "thread_id", "llm_escalated", "llm_category", "llm_reason",
@@ -326,6 +364,24 @@ with tab1:
     st.subheader("Interactive Query Classifier")
     st.markdown("Enter a customer support query or thread to evaluate whether it requires human escalation or can be handled by self-service automation.")
 
+    model_label = st.radio(
+        "Classifier:",
+        list(MODEL_CHOICES.keys()),
+        horizontal=True,
+        help=(
+            "Both are trained in-domain on the same 80/20 split of the labeled TWCS "
+            "sample. Test macro F1: TF-IDF 0.7327, DistilBERT 0.7862."
+        ),
+    )
+    model_kind = MODEL_CHOICES[model_label]
+
+    if model_kind == "distilbert" and load_distilbert() is None:
+        st.info(
+            "DistilBERT weights are not present (they are gitignored — ~256 MB). "
+            "Run **notebook 04** to regenerate them into `models/twcs/distilbert/`, "
+            "or select TF-IDF above."
+        )
+
     sample_query = st.selectbox(
         "Select a Benchmark Example Query:",
         [
@@ -344,13 +400,21 @@ with tab1:
         user_input = st.text_area("Customer Utterance:", value=sample_query, height=100)
 
     if st.button("🚀 Analyze Escalation Risk", use_container_width=True):
-        if triage_model is None:
-            st.warning(f"Model not found at `{MODEL_PATH}`. Please run `train_twcs.py` first.")
+        started = time.perf_counter()
+        result = predict_escalation(model_kind, user_input)
+        elapsed_ms = (time.perf_counter() - started) * 1000.0
+
+        if result is None:
+            if model_kind == "tfidf":
+                st.warning(f"Model not found at `{TFIDF_PATH}`. Train it via notebook 02 first.")
+            else:
+                st.warning(
+                    f"DistilBERT not available at `{DISTILBERT_DIR}`. Run notebook 04 to "
+                    "produce the weights, or switch to TF-IDF."
+                )
         else:
-            prediction = triage_model.predict([user_input])[0]
-            probabilities = triage_model.predict_proba([user_input])[0]
-            is_escalated = bool(prediction == 1)
-            confidence = probabilities[1] if is_escalated else probabilities[0]
+            is_escalated, p_escalated = result
+            confidence = p_escalated if is_escalated else 1.0 - p_escalated
             if is_escalated:
                 st.markdown(f"""
                 <div class="result-card-escalated">
@@ -371,6 +435,11 @@ with tab1:
                     </div>
                 </div>
                 """, unsafe_allow_html=True)
+
+            st.caption(
+                f"{model_label} · P(escalate) = {p_escalated:.3f} · {elapsed_ms:.1f} ms "
+                "(first DistilBERT call includes model load)"
+            )
 
 # ==============================================================================
 # TAB 2: HUMAN LABEL AUDIT

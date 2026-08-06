@@ -1,0 +1,62 @@
+{
+  "question": "Does preserving case (distilbert-base-cased) improve in-domain TWCS escalation classification?",
+  "protocol": {
+    "split": "test_size=0.20, random_state=42, stratify=escalated; val = 10% of train",
+    "hyperparameters": "lr 3e-5, batch 16, 4 epochs, max_length 128 (Notebook 04 sweep)",
+    "seeds": [
+      42,
+      1337,
+      2024
+    ],
+    "note": "Identical training loop for both encoders; only weights and tokenizer differ. The uncased arm is reused from Notebook 04 rather than retrained: same config and seeds."
+  },
+  "tokenizer_stats": [
+    {
+      "encoder": "DistilBERT uncased",
+      "vocab": 30522,
+      "mean_tokens": 37.1,
+      "p99_tokens": 86,
+      "UNK_per_1k_tokens": 6.5
+    },
+    {
+      "encoder": "DistilBERT cased",
+      "vocab": 28996,
+      "mean_tokens": 39.4,
+      "p99_tokens": 90,
+      "UNK_per_1k_tokens": 8.03
+    }
+  ],
+  "encoders": {
+    "DistilBERT uncased": {
+      "checkpoint": "distilbert-base-uncased",
+      "params_millions": 67.0,
+      "per_seed_macro_f1": [
+        0.7817,
+        0.8,
+        0.8077
+      ],
+      "mean_macro_f1": 0.7965,
+      "std_macro_f1": 0.0134,
+      "mean_roc_auc": 0.8838,
+      "mean_recall_escalated": 0.7059,
+      "latency_ms_per_query": null
+    },
+    "DistilBERT cased": {
+      "checkpoint": "distilbert-base-cased",
+      "params_millions": 65.8,
+      "per_seed_macro_f1": [
+        0.7916,
+        0.7897,
+        0.7955
+      ],
+      "mean_macro_f1": 0.7923,
+      "std_macro_f1": 0.003,
+      "mean_roc_auc": 0.8805,
+      "mean_recall_escalated": 0.7288,
+      "latency_ms_per_query": 6.25
+    }
+  },
+  "reference": {
+    "tfidf_in_domain_macro_f1": 0.7327
+  }
+}

@@ -1,4 +1,6 @@
 .project/
+.claude/
+extra/
 extra_data/
 data/twcs/llm_labeled_out_of_sample.csv
 
@@ -227,15 +229,14 @@ __marimo__/
 
 # Large data artifacts (raw + generated; reproducible via src/ scripts)
 data/twcs/twcs.csv
-# data/twcs/reconstructed_threads_20k.csv
+data/twcs/reconstructed_threads_20k.csv
 data/twcs/reconstructed_threads_20k.json
 # data/bitext/Bitext_Sample_Customer_Support_Training_Dataset_27K_responses-v11.csv
 # data/bitext/cleaned_bitext_training_data.csv
 # Keep: data/twcs/sample.csv, data/bitext/data_desc.md, and models/ artifacts
-# Keep (IMPORTANT): the labeled sample and its manifest --
-#   data/twcs/llm_labeled_5k.csv, data/twcs/sample_pool_5000.txt
-# Those two are not regenerable from src/: they are many sessions of LLM
-# labeling under the prompts.py contract, not the output of a script.
+# Keep (IMPORTANT): data/twcs/llm_labeled_5k.csv -- not regenerable, it is many
+# sessions of LLM labeling, not the output of a script.
+data/twcs/sample_pool_5000.txt
 #
 # llm_labeled_out_of_sample.csv (ignored at the top of this file) is the same
 # kind of artifact -- 639 threads labeled before the random sample existed --
@@ -243,5 +244,23 @@ data/twcs/reconstructed_threads_20k.json
 # part of the uniform sample and must not be mixed into base-rate or evaluation
 # figures. Back it up outside the repo.
 
-# src/ scripts — logic lives in the notebooks; standalone scripts are redundant
-src/
+# Fine-tuned DistilBERT weights (~256 MB each, regenerable by notebooks 03 and 04).
+# The metrics JSON now lives inside these folders for symmetry with models/*/tfidf/,
+# so it must be re-included below -- it is the tracked deliverable, and it is what the
+# notebooks read for their comparison tables.
+# Written as `dir/*` rather than `dir/` so the metrics file can be re-included: an
+# ignored *directory* cannot have its contents re-included, an ignored glob can.
+models/bitext/distilbert/*
+models/twcs/distilbert/*
+!models/bitext/distilbert/*_metrics.json
+!models/twcs/distilbert/*_metrics.json
+!models/twcs/distilbert/casing_ablation.json
+
+# src/ scripts — logic lives in the notebooks; standalone scripts are redundant.
+# Written as `src/*` rather than `src/` so a single file can be re-included below:
+# an ignored *directory* cannot have its contents re-included, an ignored glob can.
+src/*
+
+# Exception: the notebooks import this module at run time, so it has to ship with
+# them or the deliverable notebooks cannot be executed from a fresh clone.
+!src/distilbert_utils.py

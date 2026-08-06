@@ -1,0 +1,29 @@
+{
+  "description": "Four-model benchmark across the Bitext/TWCS x TF-IDF/DistilBERT design.",
+  "note": "TWCS labels are claude-opus-5 output under the contract in src/twcs/prompts.py, not human ground truth. Cross-domain numbers measure agreement with LLM triage decisions.",
+  "macro_f1": {
+    "tfidf": {
+      "bitext_in_domain": 0.9975,
+      "twcs_cross_domain": 0.5816,
+      "twcs_in_domain": 0.7327
+    },
+    "distilbert": {
+      "bitext_in_domain": 0.9982,
+      "twcs_cross_domain": 0.567,
+      "twcs_in_domain": 0.7965
+    }
+  },
+  "gap_decomposition": {
+    "architecture_gap_in_domain_twcs": 0.0638,
+    "architecture_gap_cross_domain": -0.0146,
+    "vocabulary_gap_tfidf": 0.1511,
+    "vocabulary_gap_distilbert": 0.2295,
+    "best_twcs_in_domain": 0.7965,
+    "irreducible_remainder_vs_synthetic_ceiling": 0.201
+  },
+  "latency_ms_per_query": {
+    "tfidf_cpu": 0.1361,
+    "distilbert_mps": 5.4631,
+    "distilbert_cpu": 9.1515
+  }
+}
