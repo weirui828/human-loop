@@ -177,23 +177,23 @@ Full analysis in **[03_bitext_distilbert.ipynb](notebooks/03_bitext_distilbert.i
 | | **Bitext In-Domain** (synthetic ceiling) | **TWCS Cross-Domain** (zero-shot) | **TWCS In-Domain** (80/20 real labels) |
 | :--- | :---: | :---: | :---: |
 | **TF-IDF + Logistic Regression** | 0.9975 | 0.5816 | 0.7327 |
-| **DistilBERT** | **0.9982** | 0.5670 | **0.7965** |
+| **DistilBERT** | **0.998** | 0.5568 | **0.7969** |
 
 ### 2. Decomposing the Gap
 
 | Component | Macro F1 | Reading |
 | :--- | :---: | :--- |
 | **Vocabulary gap** (TF-IDF) | **+0.1511** | What target-domain labels buy the linear family. |
-| **Vocabulary gap** (DistilBERT) | **+0.2295** | What they buy the transformer — the largest single term in the study. |
-| **Architecture gap**, in-domain | +0.0638 | What the transformer adds with training data held constant. |
-| **Architecture gap**, zero-shot | **−0.0146** | Transferred cold from synthetic data, the transformer is *behind* the baseline. |
-| **Irreducible remainder** | 0.2010 | `0.9975` ceiling − `0.7965` best real-data result. Recovered by neither data nor architecture. |
+| **Vocabulary gap** (DistilBERT) | **+0.2401** | What they buy the transformer — the largest single term in the study. |
+| **Architecture gap**, in-domain | +0.0642 | What the transformer adds with training data held constant. |
+| **Architecture gap**, zero-shot | **−0.0248** | Transferred cold from synthetic data, the transformer is *behind* the baseline. |
+| **Irreducible remainder** | 0.2006 | `0.9975` ceiling − `0.7969` best real-data result. Recovered by neither data nor architecture. |
 
 ### 3. Key Findings
 
-- **The synthetic in-domain benchmark is uninformative.** DistilBERT beats the bigram baseline by `0.0007` on Bitext — a handful of rows out of 4,927. Templated text with entity slots is linearly separable, so a benchmark run only there ranks the two architectures as equivalent and measures a property of the *corpus*, not the models.
-- **Zero-shot transfer is not deployable, and the transformer is not the fix.** DistilBERT posts the *higher* ROC-AUC (`0.6271` vs `0.5811`) but the *lower* macro F1 (`0.5670` vs `0.5816`). Fitting Bitext to a training loss near `0.001` left it emitting saturated probabilities that collapse toward the majority class off-distribution: its optimal cross-domain threshold is **`0.01`**, not `0.50`. Even granting each model its best threshold — an oracle upper bound — the gap only narrows to `0.003` and never reverses.
-- **Target-domain labels are worth ~3–4x more than architecture.** `+0.1511`/`+0.2295` from labels versus `+0.0638` from the architecture. **The implication is a labeling budget, not a model upgrade** — and the transformer pays off *after* the labels exist, not instead of them.
+- **The synthetic in-domain benchmark is uninformative.** DistilBERT beats the bigram baseline by `0.0005` on Bitext — a handful of rows out of 4,927. Templated text with entity slots is linearly separable, so a benchmark run only there ranks the two architectures as equivalent and measures a property of the *corpus*, not the models.
+- **Zero-shot transfer is not deployable, and the transformer is not the fix.** DistilBERT posts the *higher* ROC-AUC (`0.6271` vs `0.5811`) but the *lower* macro F1 (`0.5568` vs `0.5816`). Fitting Bitext to a training loss near `0.001` left it emitting saturated probabilities that collapse toward the majority class off-distribution: its optimal cross-domain threshold is **`0.01`**, not `0.50`. Even granting each model its best threshold — an oracle upper bound — the gap only narrows to `0.003` and never reverses.
+- **Target-domain labels are worth ~3–4x more than architecture.** `+0.1511`/`+0.2401` from labels versus `+0.0642` from the architecture. **The implication is a labeling budget, not a model upgrade** — and the transformer pays off *after* the labels exist, not instead of them.
 - **The in-domain gain is precision, not recall.** DistilBERT trades recall for precision rather than dominating on both. Macro F1 rewards that trade; a support desk might not. Notebook 04 therefore sets the operating point explicitly, and the macro-F1 curve is nearly flat across `0.20–0.55` — so where the errors land is very nearly a free choice.
 - **The taxonomy collision is a labeling-design lesson, not a modelling one.** Both architectures failed hardest on the same categories cross-domain, and in nearly the same rank order, because both inherited the Bitext mapping of `recover_password` and `check_invoice` to self-service. Trained on TWCS labels that never carried that error, `registration_problems` and `payment_issue` recover sharply. **No encoder can out-model a definition mistake.**
 - **Casing buys nothing.** Swapping in `distilbert-base-cased` — same size, same loop, 3 seeds — moves macro F1 by `−0.0042`, a sixth of the seed-to-seed spread. A smaller vocabulary stretched over two cases fragments harder, spending 6% more tokens and 23% more `[UNK]` on every row to recover an emphasis signal present in 12% of them. The uncased default stands, now tested rather than assumed.
@@ -247,8 +247,8 @@ The full analysis, visualizations, and results are already captured in the five 
 | :--- | :--- |
 | **[01_bitext_baseline_modeling.ipynb](notebooks/01_bitext_baseline_modeling.ipynb)** | EDA, data cleaning, feature engineering, and the in-domain TF-IDF + Logistic Regression baseline on the Bitext dataset (`macro F1 = 0.9975`). |
 | **[02_twcs_baseline_modeling.ipynb](notebooks/02_twcs_baseline_modeling.ipynb)** | The cross-domain vs. in-domain benchmark on the LLM-labeled sample (`0.5816` cross-domain vs. `0.7327` in-domain F1), plus per-category recall. |
-| **[03_bitext_distilbert.ipynb](notebooks/03_bitext_distilbert.ipynb)** | DistilBERT fine-tuned on Bitext (`0.9982` in-domain), its zero-shot transfer to TWCS (`0.5670`), the calibration analysis showing why a better-ranking model makes worse decisions, and per-category transfer against the baseline. |
-| **[04_twcs_distilbert.ipynb](notebooks/04_twcs_distilbert.ipynb)** | Learning-rate sweep and in-domain DistilBERT on TWCS (`0.7965`, 3-seed mean), the operating-threshold cost analysis, per-category recovery, and the final four-model 2×2 with the gap decomposition. |
+| **[03_bitext_distilbert.ipynb](notebooks/03_bitext_distilbert.ipynb)** | DistilBERT fine-tuned on Bitext (`0.9980` in-domain), its zero-shot transfer to TWCS (`0.5568`), the calibration analysis showing why a better-ranking model makes worse decisions, and per-category transfer against the baseline. |
+| **[04_twcs_distilbert.ipynb](notebooks/04_twcs_distilbert.ipynb)** | Learning-rate sweep and in-domain DistilBERT on TWCS (`0.7969`, 3-seed mean), the operating-threshold cost analysis, per-category recovery, and the final four-model 2×2 with the gap decomposition. |
 | **[05_casing_comparison.ipynb](notebooks/05_casing_comparison.ipynb)** | A controlled comparison testing whether `distilbert-base-cased` recovers the ALL-CAPS signal lowercasing discards. It does not (`−0.0042`, inside the noise floor), and the tokenizer statistics explain why. |
 
 *Optional — to run the notebooks locally, install the dependencies first:*

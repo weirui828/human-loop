@@ -8,22 +8,22 @@
       "twcs_in_domain": 0.7327
     },
     "distilbert": {
-      "bitext_in_domain": 0.9982,
-      "twcs_cross_domain": 0.567,
-      "twcs_in_domain": 0.7965
+      "bitext_in_domain": 0.998,
+      "twcs_cross_domain": 0.5568,
+      "twcs_in_domain": 0.7969
     }
   },
   "gap_decomposition": {
-    "architecture_gap_in_domain_twcs": 0.0638,
-    "architecture_gap_cross_domain": -0.0146,
+    "architecture_gap_in_domain_twcs": 0.0642,
+    "architecture_gap_cross_domain": -0.0248,
     "vocabulary_gap_tfidf": 0.1511,
-    "vocabulary_gap_distilbert": 0.2295,
-    "best_twcs_in_domain": 0.7965,
-    "irreducible_remainder_vs_synthetic_ceiling": 0.201
+    "vocabulary_gap_distilbert": 0.2401,
+    "best_twcs_in_domain": 0.7969,
+    "irreducible_remainder_vs_synthetic_ceiling": 0.2006
   },
   "latency_ms_per_query": {
-    "tfidf_cpu": 0.1361,
-    "distilbert_mps": 5.4631,
-    "distilbert_cpu": 9.1515
+    "tfidf_cpu": 0.1474,
+    "distilbert_mps": 6.3833,
+    "distilbert_cpu": 12.0167
   }
 }
