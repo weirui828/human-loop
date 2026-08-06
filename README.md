@@ -118,11 +118,11 @@ We evaluated a class-balanced Logistic Regression classifier trained on bigram T
 
 | Metric | Score | Rationale & Interpretation |
 | :--- | :--- | :--- |
-| **F1-Score (Macro/Weighted)** | **0.9964** | Perfectly balances Precision (preventing agent overload) and Recall (catching critical complaints). |
+| **Macro F1-Score** | **0.9975** | Perfectly balances Precision (preventing agent overload) and Recall (catching critical complaints). |
 | **ROC-AUC** | **0.9999** | Demonstrates near-perfect discrimination across all decision thresholds on clean structured data. |
 | **Accuracy** | **0.9980** | Baseline ceiling on clean, templated in-domain data. |
-| **Precision (Escalated)** | **0.9964** | Extremely low false-positive escalation rate. |
-| **Recall (Escalated)** | **0.9964** | Exactly 5 false negatives out of 1,373 actual escalations. |
+| **Precision (Macro)** | **0.9975** | Extremely low false-positive escalation rate. |
+| **Recall (Macro)** | **0.9975** | Exactly 5 false negatives out of 1,373 actual escalations. |
 | **Inference Latency** | **0.1293 ms/query** | High-speed benchmark (over 500 test runs) establishing the latency ceiling for real-time customer service deployment. |
 
 ### Why Does the Linear Baseline Score So High?
@@ -136,11 +136,11 @@ To quantify the vulnerability of surface-level lexical representations (`TF-IDF`
 
 | Metric | Bitext (In-Domain Ceiling) | TWCS In-Domain (80/20 Split) | TWCS Cross-Domain (Bitext -> Twitter) | Generalization Drop (Clean vs. Cross) |
 | :--- | :---: | :---: | :---: | :---: |
-| **Macro F1-Score** | **0.9964** | **0.7327** | **0.5816** | **-0.4148** |
+| **Macro F1-Score** | **0.9975** | **0.7327** | **0.5816** | **-0.4159** |
 | ROC-AUC | 0.9999 | 0.8258 | 0.5811 | -0.4188 |
 | Accuracy | 0.9980 | 0.7640 | 0.6604 | -0.3376 |
-| Precision (Macro) | 0.9964 | 0.7264 | 0.5874 | -0.4090 |
-| Recall (Macro) | 0.9964 | 0.7432 | 0.5792 | -0.4172 |
+| Precision (Macro) | 0.9975 | 0.7264 | 0.5874 | -0.4090 |
+| Recall (Macro) | 0.9975 | 0.7432 | 0.5792 | -0.4172 |
 
 ### Per-Category Cross-Domain Recall
 
@@ -158,7 +158,7 @@ A single F1 hides the mechanism. Because each escalated thread carries its Bitex
 
 **Key Benchmarking Takeaways:**
 - **Lexical Overfitting & Domain Shift:** The linear n-gram model drops **41 percentage points** in Macro F1 moving from structured instructions (`Bitext`) to noisy social media threads (`TWCS`). Without semantic abstraction, TF-IDF cannot recognise that slang (`wtf`, `sux`, `pls help`) maps to the intents it trained on.
-- **Vocabulary mismatch explains ~15 points, not half the gap.** Retraining on target-domain vocabulary buys `+0.1511` F1 (`0.5816 -> 0.7327`). The remaining `0.2637` to the synthetic ceiling is an architectural limit, not a vocabulary one.
+- **Vocabulary mismatch explains ~15 points, not half the gap.** Retraining on target-domain vocabulary buys `+0.1511` F1 (`0.5816 -> 0.7327`). The remaining `0.2648` to the synthetic ceiling is an architectural limit, not a vocabulary one.
 - **The in-domain ceiling is `0.7327`.** That is what a linear n-gram model extracts from the customer's opening message alone — the only text available at triage time, before any reply exists.
 - **The worst failures are a taxonomy collision, not just noise.** `registration_problems` (0.20) and `payment_issue` (0.35) are *functional* intents with distinctive vocabulary and should have been easy. They fail because Bitext maps `recover_password` and `check_invoice` to **self-service (0)**, while in real Twitter traffic a lockout or a missing payment is exactly what needs a human. The model matches the words correctly and applies the wrong rule. The two categories a support desk can least afford to misroute — locked-out users and missing money — are the two this baseline is worst at catching.
 
@@ -170,7 +170,7 @@ We then fine-tuned **DistilBERT** (`distilbert-base-uncased`) to test whether se
 
 Full analysis in **[03_bitext_distilbert.ipynb](notebooks/03_bitext_distilbert.ipynb)** and **[04_twcs_distilbert.ipynb](notebooks/04_twcs_distilbert.ipynb)**. Both notebooks reuse the *exact* 80/20 splits of the baselines (`random_state=42`) and verify it by re-scoring the serialized TF-IDF pipelines on the reconstructed test sets before making any comparison.
 
-> All figures below are **macro F1** averaged over both classes. Notebook 01's headline `0.9964` was the positive-class F1; the same baseline model scores `0.9975` macro on the same rows. The two are different averages of one confusion matrix, not conflicting results.
+> All F1 figures in this project are **macro** — averaged over both classes.
 
 ### 1. The Complete 2×2 Benchmark
 
@@ -245,7 +245,7 @@ The full analysis, visualizations, and results are already captured in the five 
 
 | Notebook | What's Inside |
 | :--- | :--- |
-| **[01_bitext_baseline_modeling.ipynb](notebooks/01_bitext_baseline_modeling.ipynb)** | EDA, data cleaning, feature engineering, and the in-domain TF-IDF + Logistic Regression baseline on the Bitext dataset (`F1 = 0.9964`). |
+| **[01_bitext_baseline_modeling.ipynb](notebooks/01_bitext_baseline_modeling.ipynb)** | EDA, data cleaning, feature engineering, and the in-domain TF-IDF + Logistic Regression baseline on the Bitext dataset (`macro F1 = 0.9975`). |
 | **[02_twcs_baseline_modeling.ipynb](notebooks/02_twcs_baseline_modeling.ipynb)** | The cross-domain vs. in-domain benchmark on the LLM-labeled sample (`0.5816` cross-domain vs. `0.7327` in-domain F1), plus per-category recall. |
 | **[03_bitext_distilbert.ipynb](notebooks/03_bitext_distilbert.ipynb)** | DistilBERT fine-tuned on Bitext (`0.9982` in-domain), its zero-shot transfer to TWCS (`0.5670`), the calibration analysis showing why a better-ranking model makes worse decisions, and per-category transfer against the baseline. |
 | **[04_twcs_distilbert.ipynb](notebooks/04_twcs_distilbert.ipynb)** | Learning-rate sweep and in-domain DistilBERT on TWCS (`0.7965`, 3-seed mean), the operating-threshold cost analysis, per-category recovery, and the final four-model 2×2 with the gap decomposition. |

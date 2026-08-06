@@ -2,12 +2,12 @@
   "model_name": "TF-IDF + Logistic Regression (Balanced)",
   "train_samples": 19708,
   "test_samples": 4927,
-  "train_duration_sec": 0.1389,
+  "train_duration_sec": 0.1101,
   "metrics": {
     "accuracy": 0.998,
-    "precision": 0.9964,
-    "recall": 0.9964,
-    "f1_score": 0.9964,
+    "precision_macro": 0.9975,
+    "recall_macro": 0.9975,
+    "f1_macro": 0.9975,
     "roc_auc": 0.9999
   },
   "confusion_matrix": {
@@ -17,7 +17,7 @@
     "tp": 1368
   },
   "latency_benchmark": {
-    "avg_inference_ms_per_query": 0.1293,
+    "avg_inference_ms_per_query": 0.1349,
     "test_iterations": 500
   }
 }
