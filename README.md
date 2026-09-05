@@ -199,12 +199,11 @@ It is worth noting that a frontier LLM answering the same question takes roughly
 
 ### 4. Findings
 
-- **The Bitext benchmark tells you nothing.** DistilBERT beats the bigram model by `0.0005` there — a handful of rows out of 4,927. Templated text is easy for both, so testing only on it would rank them as equivalent.
-- **Trained on synthetic data and dropped onto tweets, the transformer is worse.** `0.5568` against `0.5816`. It does *order* the threads better (ROC-AUC `0.6271` vs `0.5811`), but it fits Bitext so completely that it becomes over-confident: nearly every tweet scores near zero, so at the usual `0.5` cut-off it flags almost nothing. Its best cut-off turns out to be `0.01`. Even given that best case, it still loses.
-- **Real labels are worth ~4x a better model.** `+0.1511`/`+0.2401` from labels versus `+0.0642` from the architecture. **Spend the budget on labeling** — the transformer pays off afterwards, on the data you then have.
+- **The Bitext benchmark tells you nothing.** DistilBERT beats the bigram model by `0.0005` there — a handful of rows out of 4,927 testing cases. Templated text is easy for both, so testing only on it would rank them as equivalent.
+- **Trained on synthetic data and dropped onto tweets, the transformer is worse.** `0.5568` against `0.5816`. It fits Bitext so completely that it becomes over-confident: nearly every tweet scores near zero, so at the usual `0.5` cut-off it flags almost nothing. Its best cut-off turns out to be `0.01`. Even given that best case, it still loses.
+- **Better labels are worth more than a better model.** Both architectures failed on the same categories cross-domain, in nearly the same order. A better model inherits the mistake; new labels remove it. Spend the budget on labeling first.
 - **The in-domain gain is precision, not recall.** DistilBERT raises far fewer false alarms but misses slightly more escalations. Macro F1 likes that trade; a support desk might not, which is why notebook 04 picks the cut-off deliberately.
-- **Bad labels cannot be fixed by a better model.** Both architectures failed on the same categories cross-domain, in nearly the same order, because both learned Bitext's rule that password resets are self-service. Trained on labels without that error, those categories recover.
-- **Casing changes nothing.** `distilbert-base-cased` — same size, same loop, 3 seeds — moves macro F1 by `−0.0042`, a fraction of the variation between seeds. Keeping case costs 6% more tokens and 23% more `[UNK]` on every tweet, to recover emphasis present in 12% of them.
+- **Casing changes nothing.** `distilbert-base-cased` — same size, same loop, 3 seeds — moves macro F1 by `−0.0042`, a fraction of the variation between seeds. Keeping case costs 6% more tokens and 23% more unknown tokens on every tweet.
 - **The transformer's cost is real but affordable.** ~2,600x the training time and ~43x the inference time of the baseline, and both are still small in absolute terms.
 
 ### 5. What we would deploy
